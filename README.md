@@ -21,7 +21,7 @@ docs/           Specs and design docs
 
 ```bash
 # 1. Install deps
-pip install -e primitives/
+pip install -e .
 
 # 2. Set your Gemini key
 export GEMINI_API_KEY=...
