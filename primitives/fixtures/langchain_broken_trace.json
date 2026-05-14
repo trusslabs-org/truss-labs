@@ -1,0 +1,68 @@
+[
+  {
+    "run_id": "root-001",
+    "parent_run_id": null,
+    "run_type": "chain",
+    "name": "TrussLabsResearchAgent",
+    "inputs": { "query": "Who founded Truss Labs?" },
+    "outputs": null,
+    "error": null,
+    "start_time": "2026-04-17T15:00:00Z",
+    "end_time": null
+  },
+  {
+    "run_id": "llm-001",
+    "parent_run_id": "root-001",
+    "run_type": "llm",
+    "name": "ChatOpenAI",
+    "inputs": { "prompt": "Identify the founder of Truss Labs." },
+    "outputs": { "text": "I need to search for 'Truss Labs founder'." },
+    "error": null,
+    "start_time": "2026-04-17T15:00:01Z",
+    "end_time": "2026-04-17T15:00:02Z"
+  },
+  {
+    "run_id": "tool-001",
+    "parent_run_id": "root-001",
+    "run_type": "tool",
+    "name": "GoogleSearch",
+    "inputs": { "query": "Truss Labs founder" },
+    "outputs": { "result": "No direct results found for 'Truss Labs founder'." },
+    "error": null,
+    "start_time": "2026-04-17T15:00:03Z",
+    "end_time": "2026-04-17T15:00:04Z"
+  },
+  {
+    "run_id": "llm-002",
+    "parent_run_id": "root-001",
+    "run_type": "llm",
+    "name": "ChatOpenAI",
+    "inputs": { "prompt": "Observation: No direct results found. What is the next step?" },
+    "outputs": { "text": "I will try searching for 'Truss Labs founder' again." },
+    "error": null,
+    "start_time": "2026-04-17T15:00:05Z",
+    "end_time": "2026-04-17T15:00:06Z"
+  },
+  {
+    "run_id": "tool-002",
+    "parent_run_id": "root-001",
+    "run_type": "tool",
+    "name": "GoogleSearch",
+    "inputs": { "query": "Truss Labs founder" },
+    "outputs": { "result": "No direct results found for 'Truss Labs founder'." },
+    "error": null,
+    "start_time": "2026-04-17T15:00:07Z",
+    "end_time": "2026-04-17T15:00:08Z"
+  },
+  {
+    "run_id": "llm-003",
+    "parent_run_id": "root-001",
+    "run_type": "llm",
+    "name": "ChatOpenAI",
+    "inputs": { "prompt": "Observation: No results. Next step?" },
+    "outputs": { "text": "Truss Labs was founded by John Smith in 2020." },
+    "error": "CRITICAL: Hallucination detected. Fact-check failed.",
+    "start_time": "2026-04-17T15:00:09Z",
+    "end_time": "2026-04-17T15:00:10Z"
+  }
+]

@@ -1,0 +1,119 @@
+---
+import Layout from '../layouts/Layout.astro';
+import 'asciinema-player/dist/bundle/asciinema-player.css';
+---
+
+<Layout title="Home" description="AI activity visibility on infrastructure you control">
+	<section class="space-y-16">
+		<div class="prose prose-invert max-w-none">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">What I'm building</h2>
+			<p class="text-xl leading-relaxed">
+				See what AI is doing with your sensitive data — on infrastructure you control.
+			</p>
+			<p class="text-dim leading-relaxed">
+				Truss is the visibility and control layer between AI agents and the systems that hold sensitive data. It captures every prompt, every response, and every action an agent takes, into a durable on-disk ledger your auditors and counsel can read directly. No vendor portal. No opaque chat history. The runtime is software you run yourself — physical box, VM, container, or your own cloud account. There is no Truss-operated cloud in the data path, ever.
+			</p>
+			<p class="text-dim leading-relaxed">
+				It extends the EDR/DLP stack you already run (CrowdStrike, Varonis, Proofpoint) into the prompt-and-response layer those tools structurally cannot see.
+			</p>
+			<p class="text-dim text-sm leading-relaxed pt-2">
+				Live demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a> — an audit proxy in front of Gemini, with three policy verdicts (block / redact / allow) and a 7-day retention timer. Zero inbound ports on the host.
+			</p>
+		</div>
+
+		<div class="pt-4">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Two products, one architecture</h2>
+			<div class="grid md:grid-cols-2 gap-8">
+				<div class="space-y-3">
+					<h3 class="text-text">Truss Audit — for CISOs</h3>
+					<p class="text-dim text-sm leading-relaxed">
+						Captures prompts, responses, sensitive-data class hits, downstream actions, and policy verdicts into audit-defensible receipts on customer-controlled infrastructure. Receipts are JSON files you can grep, query with SQLite, and retain on your own schedule. Designed to answer the questions a board, a county counsel, or a cyber-insurance questionnaire actually asks.
+					</p>
+				</div>
+				<div class="space-y-3">
+					<h3 class="text-text">Soul OS — for builders</h3>
+					<p class="text-dim text-sm leading-relaxed">
+						The broader harness I run on my own machine. Same architecture (customer-controlled runtime, on-disk state, no vendor cloud in the data path), plus steering primitives for shaping live agent reasoning. Sold to builders, not to CISOs. The audit-and-policy slice is what productizes for the CISO buyer.
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="pt-4">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Six months of dogfooding, on this laptop</h2>
+			<p class="text-dim leading-relaxed">
+				Truss Audit is not a hypothesis. It is the productized version of a tool I have been running for myself, on my own laptop, for the past six months.
+			</p>
+			<p class="text-dim leading-relaxed pt-3">
+				That tool is Soul OS. State at <code>~/soul_registry/</code>, config at <code>~/dotfiles/soul/</code>. No external SaaS in the data path. Files I own, formats I control, queryable with <code>grep</code>, <code>jq</code>, and <code>sqlite</code> against the directory directly. Sessions distilled at close into an immutable record. Decisions logged to a ledger. Tasks tracked as JSON files I version-control.
+			</p>
+			<p class="text-dim leading-relaxed pt-3">
+				The architecture maps almost line-for-line onto what Truss Audit ships: task state in <code>~/soul_registry/tasks/</code> becomes AI activity in <code>~/.truss/receipts/</code>; the session ledger becomes the receipt stream; the gates I wrote to keep agents from breaking my workflow become the policy YAML. Same shape — one for me, one for the customer.
+			</p>
+			<p class="text-dim text-sm leading-relaxed pt-3">
+				A CISO can ask <em>"do you actually run this?"</em> and the honest answer is: yes, daily, for six months, on this machine.
+			</p>
+		</div>
+
+		<div class="pt-4">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Show me</h2>
+			<p class="text-dim leading-relaxed mb-6">
+				Below is 383 lines of an AI agent's tool-call log — a real session from this laptop's registry, JSONL on disk. Three small command-line tools, piped together, find every retry loop the agent got stuck in. <code class="text-accent">TRAP-1</code> is the halt event.
+			</p>
+
+			<div id="asciinema-demo" class="my-8 rounded border border-white/10 overflow-hidden"></div>
+
+			<p class="text-dim text-sm leading-relaxed pb-3">
+				The shape of the pipe — three primitives, four lines:
+			</p>
+			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code>cat ~/soul_registry/sessions/PROJECT/SESSION/hooks.jsonl \
+  | python3 primitives/scripts/soul_translate.py \
+  | python3 primitives/scripts/soul_query.py --json --flag FLAG_CIRCULAR_REASONING \
+  | python3 primitives/scripts/soul_trap.py run \
+  | head -3</code></pre>
+
+			<p class="text-dim text-sm leading-relaxed pt-4">
+				Same shell vocabulary you already use, applied to your agent's behavior. Files on disk, pipes between them. Replace <code>head -3</code> with <code>grep</code>, <code>jq</code>, <code>awk</code>, your own scripts — that's the point.
+			</p>
+			<p class="text-dim text-xs leading-relaxed pt-3">
+				Primitives ship publicly soon — currently bundled with sensitive call notes in the working tree.
+			</p>
+		</div>
+
+		<div class="pt-4">
+			<p class="text-dim text-sm leading-relaxed">
+				Status: pre-product as a SKU. First validated discovery call: 2026.05.07. Live demo up. Building toward a paid pilot. I'm writing about the work as it ships rather than waiting for a launch.
+			</p>
+		</div>
+
+		<script>
+			import * as AsciinemaPlayer from 'asciinema-player';
+			const target = document.getElementById('asciinema-demo');
+			if (target) {
+				AsciinemaPlayer.create('/demo/artifact_3_unix_pipe.cast', target, {
+					autoPlay: true,
+					loop: true,
+					speed: 0.7,
+					theme: 'asciinema',
+					fit: 'width',
+					controls: true,
+				});
+			}
+		</script>
+
+		<div class="pt-12 border-t border-white/5">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Writing</h2>
+			<div class="space-y-8">
+				<article class="group">
+					<a href="/blog/the-birth-of-truss-labs" class="block space-y-2 hover:no-underline">
+						<time class="text-xs text-dim uppercase tracking-widest">April 17, 2026</time>
+						<h3 class="text-lg group-hover:text-accent transition-colors">Why I started Truss Labs</h3>
+						<p class="text-dim text-sm line-clamp-2">
+							Notes on incorporating in New York, picking a C-Corp, and why I'm working on agent infrastructure instead of another agent product.
+						</p>
+					</a>
+				</article>
+			</div>
+		</div>
+	</section>
+</Layout>

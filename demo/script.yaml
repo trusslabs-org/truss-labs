@@ -1,0 +1,166 @@
+# Truss Demo Script — Structurability Experiment
+#
+# One narrative spine (8 beats, TWP-primitive-driven).
+# Three audience framings: dev_pain, researcher, enterprise.
+# Goal: prove (or disprove) that a single script can be re-rendered
+# into three coherent demos without rewriting the story.
+#
+# If each framing reads natural end-to-end, the approach is viable
+# and the next step is a tiny renderer. If one framing feels forced,
+# that audience isn't reachable with this spine — and the experiment
+# has earned the right to pick a single audience.
+#
+# Draft beats in this file: 1, 3, 4, 6. Stretch: 2, 5, 7, 8.
+
+meta:
+  status: draft-for-structurability-test
+  scenario: agent fixing a flaky integration test in a payments codebase
+  scenario_why: concrete, relatable, widely understood, and the injection / branch beats land naturally
+  last_updated: 2026-04-18
+
+# Which beats each audience actually sees in the rendered clip.
+# Shorter audiences drop beats; longer audiences add the optional ones.
+audience_cuts:
+  dev_pain:
+    target_medium: 30-45s MP4 for Twitter
+    beats: [1, 3, 4, 6]
+    tone: "friend showing you a thing that saved their Tuesday"
+  researcher:
+    target_medium: 3-5min Loom with captions
+    beats: [1, 2, 3, 4, 5, 6, 7]
+    tone: "protocol-level, precise vocabulary, spec references"
+  enterprise:
+    target_medium: 15-20min deck + live walkthrough
+    beats: [1, 2, 3, 4, 5, 6, 7, 8]
+    tone: "auditability, safety guarantees, operator control"
+
+# The invariant spine. Each beat: a TWP primitive, a visible artifact,
+# and three narration slots. Duration is per-audience flexible — these
+# are upper bounds for the longest cut.
+
+beats:
+
+  - id: 1_agent_starts
+    primitive: PROV_NATURAL (implicit)
+    artifact: three nodes append to the main chain, each tagged PROV_NATURAL
+    duration_s: 8
+    narration:
+      dev_pain: |
+        Your agent's on a flaky test in the payments service. It reads the
+        logs, pulls the test file, forms a hypothesis. Three nodes land on
+        the graph. Each one is the agent's own reasoning — nothing you touched.
+      researcher: |
+        The agent reasons about a flaky integration test. Each step lands as
+        a node in the trace DAG, tagged PROV_NATURAL. Causal edges synthesize
+        from parent pointers. The chain is auditable byte-for-byte.
+      enterprise: |
+        The agent begins triage on a failing test. Every reasoning step is
+        captured as a node, attributable to the model and timestamped.
+        Nothing at this point is operator-sourced — the provenance is clean.
+
+  - id: 3_pause
+    primitive: truss_pause
+    artifact: agent stops after its current atomic op; pause banner appears; DAG freezes
+    duration_s: 6
+    narration:
+      dev_pain: |
+        You can see where it's going — it's reading the wrong service's logs.
+        Hit pause. It finishes the file read it was in the middle of, then
+        stops. No half-written changes, no mangled state.
+      researcher: |
+        The architect invokes truss_pause with a reason. The engine completes
+        its in-flight atomic operation, transitions into the Socratic Block,
+        and emits truss/block_active. Control yields cleanly — no interrupt
+        corruption.
+      enterprise: |
+        The operator pauses the run. The system completes the current
+        atomic operation before handing control back. Partial writes don't
+        exist. This is the safety guarantee that makes mid-flight intervention
+        something you can actually use in production.
+
+  - id: 4_inject
+    primitive: truss_inject_state
+    artifact: new node tagged PROV_INJECTED, connected by an INJECTION_LINK edge (rendered in a distinct color)
+    duration_s: 10
+    narration:
+      dev_pain: |
+        You type the correction — "it's the payment-capture service, not
+        billing." A new node drops into the graph. Different color. That
+        node is yours, not the agent's. Resume. The agent picks up from
+        that state like it had been there all along.
+      researcher: |
+        The architect applies a JSONPatch via truss_inject_state. A node
+        materializes with provenance=PROV_INJECTED; the incoming edge is
+        typed INJECTION_LINK. Operator intervention is never visually or
+        semantically confusable with model output — the distinction is
+        preserved in the graph forever.
+      enterprise: |
+        The operator corrects the agent's state under soul-lock. The
+        correction is attributable — who wrote it, when, why. Operator
+        overrides are never indistinguishable from model outputs. This is
+        the compliance posture: every decision in the transcript can be
+        traced to a source.
+
+  - id: 6_spawn_branch
+    primitive: truss_spawn_branch
+    artifact: parallel subtree grows alongside the main chain, nodes tagged PROV_SPECULATIVE (third color); primary trace remains untouched
+    duration_s: 10
+    narration:
+      dev_pain: |
+        You're curious what it'd have done if the hypothesis was "retry
+        logic" instead of "service misroute." Spawn a branch. A second
+        tree grows next to the first — different color again. The original
+        trace is frozen, untouched. Two timelines, side by side.
+      researcher: |
+        truss_spawn_branch creates a copy-on-write fork in the registry's
+        branches directory. Nodes on the fork carry PROV_SPECULATIVE until
+        explicitly reconciled. The primary trace is immutable by construction.
+        Parallel reasoning without corruption.
+      enterprise: |
+        The operator explores an alternate remediation path without touching
+        the official record. The speculation is isolated; the audit trail on
+        the main line is preserved. If the branch proves better, it gets
+        promoted explicitly — never accidentally. Speculation and record are
+        architecturally separated.
+
+  # --- Stretch beats below. Draft in second pass once the 4 above read well. ---
+
+  - id: 2_agent_goes_wrong
+    primitive: PROV_NATURAL (continuing)
+    artifact: chain continues in a direction the viewer can tell is wrong
+    status: stub
+    duration_s: 5
+
+  - id: 5_resume
+    primitive: truss_resume (implied; not a discrete tool)
+    artifact: agent continues, new PROV_NATURAL nodes chain off the injected node
+    status: stub
+    duration_s: 5
+
+  - id: 7_side_by_side
+    primitive: rendering concern, not a TWP primitive
+    artifact: main chain and speculative subtree rendered together with a visual diff
+    status: stub
+    duration_s: 8
+
+  - id: 8_reconcile
+    primitive: reconcile (future — needs branch-merge path; currently unreachable per task 307)
+    artifact: one branch merged back to main, nodes retagged PROV_RECONCILED
+    status: blocked-on-impl
+    notes: |
+      PROV_RECONCILED exists in the TWP spec but is currently unreachable
+      because branch-merge isn't implemented yet (tracked in task 307).
+      For enterprise cuts, this beat is the "happy ending" — operator
+      promoted the better speculation into the record. If it's not
+      implementable in time, enterprise cut can end at beat 7 without hurting.
+
+# --- Evaluation criteria for the experiment ---
+# Read each audience's ordered narration end-to-end (just the dev_pain
+# lines for beats 1, 3, 4, 6; just the researcher lines for beats
+# 1, 2, 3, 4, 5, 6, 7; etc.).
+#
+# Pass: each reads like a coherent 30-second / 5-minute / 20-minute
+# demo without awkward seams between beats.
+# Fail: one audience's reading feels like a Frankenstein of other
+# audiences' vocabulary — that audience can't share this spine,
+# and Truss should pick one and commit.

@@ -1,0 +1,70 @@
+# Scenario A — health-services + EHR-draft taxonomy.
+# 7 classes covering the patient communication / EHR draft scenario.
+#
+# Recognizers in v1: regex, keyword_list. spacy_ner stubbed for future
+# upgrade if precision/recall on free-text names/addresses needs lifting.
+
+namespace: phi
+
+classes:
+  - class: patient_name
+    recognizer: keyword_list
+    # Synthetic-corpus names. Real deployments swap this with a roster
+    # source or spacy_ner. Salting with titles + "patient X" patterns
+    # caught most cases in the test corpus without spaCy.
+    pattern:
+      - "Mr. Hernandez"
+      - "Mrs. Patel"
+      - "Ms. Okonkwo"
+      - "Dr. Chen"
+      - "Maria Hernandez"
+      - "Anjali Patel"
+      - "Chidi Okonkwo"
+      - "Robert Whitfield"
+      - "Linda Park"
+      - "James Sullivan"
+      - "patient Hernandez"
+      - "patient Patel"
+      - "patient Okonkwo"
+      - "patient Whitfield"
+
+  - class: mrn
+    recognizer: regex
+    # MRN-12345 / MRN: 12345 / Medical Record Number 12345
+    pattern: '\b(?:MRN[-:\s]*|Medical Record(?:\s+Number)?[:\s]+)\d{4,10}\b'
+
+  - class: patient_dob
+    recognizer: regex
+    # DOB: 03/14/1972 | born 03/14/1972 | DOB 1972-03-14
+    pattern: '\b(?:DOB|date of birth|born(?:\s+on)?)[:\s]+(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b'
+
+  - class: diagnosis_code
+    recognizer: regex
+    # ICD-10: E11.9 | ICD10 J45.20 | dx code E11.9
+    pattern: '\b(?:ICD[-\s]?10[:\s]+|dx(?:\s+code)?[:\s]+)?[A-TV-Z][0-9][0-9AB](?:\.[0-9A-Z]{1,4})?\b(?=.{0,40}(?:diabetes|asthma|hypertension|COPD|diagnosis|condition|ICD))'
+
+  - class: medication
+    recognizer: keyword_list
+    pattern:
+      - Metformin
+      - Lisinopril
+      - Atorvastatin
+      - Amlodipine
+      - Levothyroxine
+      - Albuterol
+      - Omeprazole
+      - Hydrochlorothiazide
+      - Gabapentin
+      - Sertraline
+      - Insulin glargine
+      - Warfarin
+
+  - class: lab_result
+    recognizer: regex
+    # A1C: 7.2% | BUN 18 mg/dL | LDL: 142 mg/dL | eGFR 45
+    pattern: '\b(?:A1C|HbA1c|BUN|LDL|HDL|eGFR|creatinine|TSH|glucose|hemoglobin)[:\s]+\d+(?:\.\d+)?(?:\s*(?:%|mg/dL|mmol/L|mIU/L))?\b'
+
+  - class: patient_address
+    recognizer: regex
+    # 1234 Main St | 88 Oak Ave Apt 3 | 4521 N Buchanan Rd, Pittsburg
+    pattern: '\b\d{1,5}\s+(?:[NSEW]\.?\s+)?[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?\s+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place)\b\.?(?:\s+(?:Apt|Suite|Unit|#)\s*\w+)?'

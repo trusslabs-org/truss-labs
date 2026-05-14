@@ -1,0 +1,36 @@
+[Unit]
+Description=Truss Audit Proxy
+Documentation=https://github.com/trusslabs/truss-labs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=truss
+Group=truss
+WorkingDirectory=/opt/truss/truss-labs
+EnvironmentFile=/etc/truss/env
+Environment=TRUSS_POLICIES_DIR=/opt/truss/truss-labs/examples/policies
+Environment=TRUSS_RECEIPTS_DIR=/var/truss/receipts
+Environment=TRUSS_TAXONOMIES=/opt/truss/truss-labs/primitives/audit/taxonomies/phi.yaml
+Environment=GEMINI_MODEL_ID=gemini-3-flash-preview
+Environment=TRUSS_DEMO_HTML=/opt/truss/truss-labs/examples/demo.html
+ExecStart=/opt/truss/venv/bin/python -m uvicorn primitives.audit.proxy:create_app_from_env --factory --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Hardening — the proxy needs nothing outside its own dirs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/truss
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

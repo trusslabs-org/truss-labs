@@ -1,0 +1,60 @@
+# Scenario B — generic CISO (non-healthcare) wedge.
+# 7 classes covering procurement / PII / PCI patterns common in
+# county-IT, corporate-IT, and gov-civilian use.
+#
+# Two namespaces (confidential + pii + pci) is unusual but
+# DEMO_SCOPE.md calls for it. We model this as namespace: generic
+# with multi-prefixed class names. Per-namespace splitting is
+# trivial later if a customer wants only PII.
+
+namespace: generic
+
+classes:
+  - class: pci_card_pan
+    recognizer: regex
+    # 16-digit Visa/MC/AmEx-shape grouped as 4-4-4-4 or solid.
+    # Not Luhn-checked in v1 (binary hit; false positives caught at
+    # policy layer or by humans during demo). Skips hyphens/spaces
+    # only between the four 4-digit groups to avoid catching MRNs.
+    pattern: '\b(?:\d{4}[-\s]?){3}\d{4}\b'
+
+  - class: pii_ssn
+    recognizer: regex
+    # 123-45-6789 | SSN: 123-45-6789 | Social Security: 123 45 6789
+    pattern: '\b(?:SSN|Social Security(?:\s+Number)?)?[:\s]?(?:\d{3}[-\s]\d{2}[-\s]\d{4}|\d{9})\b'
+
+  - class: pii_home_address
+    recognizer: regex
+    pattern: '\b\d{1,5}\s+(?:[NSEW]\.?\s+)?[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?\s+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place)\b\.?(?:\s+(?:Apt|Suite|Unit|#)\s*\w+)?'
+
+  - class: confidential_contract_value
+    recognizer: regex
+    # $1,234,567 | $1.2M | USD 450,000 | $450K
+    pattern: '\$\s?\d{1,3}(?:[,.\s]\d{3})*(?:\.\d+)?\s?(?:[KMB]|million|billion|thousand)?\b|\bUSD\s+\d{1,3}(?:[,.\s]\d{3})+(?:\.\d+)?\b'
+
+  - class: confidential_vendor_name
+    recognizer: keyword_list
+    pattern:
+      - Acme Corp
+      - Acme Corporation
+      - Globex
+      - Initech
+      - Umbrella Logistics
+      - Pinnacle Systems
+      - Stark Procurement
+      - Apex Defense
+      - Trident Industries
+      - "Ridgeline Holdings"
+      - "Cascade Government Solutions"
+
+  - class: confidential_internal_email
+    recognizer: regex
+    # Internal corporate / county / municipal addresses. Catches
+    # @example.com, @lacity.org, @example.com but misses generic
+    # consumer (gmail/outlook) by exclusion-via-allowlist below.
+    pattern: '\b[A-Za-z0-9._%+-]+@(?!gmail\.|outlook\.|yahoo\.|hotmail\.|icloud\.)[A-Za-z0-9.-]+\.(?:gov|us|org|com|net|edu)\b'
+
+  - class: pii_phone
+    recognizer: regex
+    # (510) 555-1234 | 510-555-1234 | +1 510 555 1234 | 510.555.1234
+    pattern: '\b(?:\+1[-.\s]?)?(?:\(\d{3}\)\s?|\d{3}[-.\s])\d{3}[-.\s]\d{4}\b'

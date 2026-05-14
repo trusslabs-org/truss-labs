@@ -1,0 +1,14 @@
+schema_version: "1.0"
+policy_id: phi_redact_dob_in_response
+policy_version: v1.0
+match:
+  direction: response
+  destination: any
+  classes:
+    any_of:
+      - phi:patient_dob
+verdict: redact
+redact_config:
+  redact_with: "[REDACTED:{class}]"
+audit_only: false
+on_classifier_error: fail_open

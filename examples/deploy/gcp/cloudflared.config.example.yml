@@ -1,0 +1,19 @@
+# Example /etc/cloudflared/config.yml for the Truss audit-proxy demo.
+#
+# Used only if you take the CLI path for cloudflared (see README §3b).
+# The web/Zero-Trust-dashboard path doesn't need this file — the dashboard
+# generates a token and you run `cloudflared service install <token>`.
+#
+# Replace TUNNEL_UUID with the UUID printed by `cloudflared tunnel create truss-demo`.
+
+tunnel: TUNNEL_UUID
+credentials-file: /etc/cloudflared/TUNNEL_UUID.json
+
+ingress:
+  - hostname: demo.trusslabs.org
+    service: http://localhost:8000
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: false
+  # Catch-all — required by cloudflared.
+  - service: http_status:404

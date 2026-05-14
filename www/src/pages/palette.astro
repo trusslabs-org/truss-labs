@@ -1,0 +1,91 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const swatches: Array<{ role: string; token: string; notes: string }> = [
+	{ role: 'Background',         token: '--sys-color-bg',                  notes: 'page canvas' },
+	{ role: 'Surface',            token: '--sys-color-surface',             notes: 'raised panel' },
+	{ role: 'Surface variant',    token: '--sys-color-surface-variant',     notes: 'nested panel' },
+	{ role: 'Text',               token: '--sys-color-text',                notes: 'primary copy' },
+	{ role: 'Text dim',           token: '--sys-color-text-dim',            notes: 'captions, metadata' },
+	{ role: 'Text placeholder',   token: '--sys-color-text-placeholder',    notes: 'inputs, disabled' },
+	{ role: 'Outline',            token: '--sys-color-outline',             notes: 'dividers' },
+	{ role: 'Outline strong',     token: '--sys-color-outline-strong',      notes: 'input borders, focus' },
+	{ role: 'Accent',             token: '--sys-color-accent',              notes: 'brand coral, links' },
+	{ role: 'Accent hover',       token: '--sys-color-accent-hover',        notes: 'button hover, visited' },
+	{ role: 'On-accent',          token: '--sys-color-on-accent',           notes: 'text on coral' },
+	{ role: 'Status allowed',     token: '--sys-color-status-allowed',      notes: 'operational' },
+	{ role: 'Status redacted',    token: '--sys-color-status-redacted',     notes: 'demo banner, redact' },
+	{ role: 'Status blocked',     token: '--sys-color-status-blocked',      notes: 'verdict-blocked' },
+];
+---
+
+<Layout title="Palette">
+	<section class="space-y-8">
+		<div class="prose prose-invert max-w-none">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Design tokens — palette reference</h2>
+			<p class="text-dim text-sm">
+				Live values from <code>src/styles/tokens.css</code>. Each chip renders the actual computed CSS variable —
+				if a token shifts, this page reflects it without a rebuild of the swatch list. Spec: <code>docs/research/DESIGN_SYSTEM_v1.md §3.6</code>.
+			</p>
+		</div>
+
+		<div class="grid md:grid-cols-2 gap-3">
+			{swatches.map((s) => (
+				<div class="flex items-stretch gap-3 border border-white/10 rounded">
+					<div
+						class="w-20 shrink-0 border-r border-white/10 swatch-checker"
+					>
+						<div class="h-full w-full" style={`background: var(${s.token});`}></div>
+					</div>
+					<div class="py-2 pr-3 text-sm flex-1 min-w-0">
+						<div class="text-text">{s.role}</div>
+						<div class="text-dim text-xs mt-1 break-all"><code>{s.token}</code></div>
+						<div class="text-dim text-xs mt-1" data-hex-of={s.token}>—</div>
+						<div class="text-dim text-xs mt-1">{s.notes}</div>
+					</div>
+				</div>
+			))}
+		</div>
+
+		<div class="pt-6">
+			<h3 class="text-text text-lg mb-3">On-accent contrast check</h3>
+			<div
+				class="p-4 rounded text-sm"
+				style="background: var(--sys-color-accent); color: var(--sys-color-on-accent);"
+			>
+				Sample text on accent surface — should be readable (target ≥ 4.5:1).
+			</div>
+		</div>
+
+		<div class="pt-6">
+			<h3 class="text-text text-lg mb-3">Verdict pills</h3>
+			<div class="flex gap-3 flex-wrap">
+				<span class="px-2 py-1 rounded text-xs font-bold" style="background: var(--sys-color-status-allowed); color: var(--sys-color-bg);">ALLOWED</span>
+				<span class="px-2 py-1 rounded text-xs font-bold" style="background: var(--sys-color-status-redacted); color: var(--sys-color-bg);">REDACTED</span>
+				<span class="px-2 py-1 rounded text-xs font-bold" style="background: var(--sys-color-status-blocked); color: var(--sys-color-bg);">BLOCKED</span>
+			</div>
+		</div>
+	</section>
+
+	<style>
+		.swatch-checker {
+			background-image:
+				linear-gradient(45deg, #444 25%, transparent 25%),
+				linear-gradient(-45deg, #444 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, #444 75%),
+				linear-gradient(-45deg, transparent 75%, #444 75%);
+			background-size: 12px 12px;
+			background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+		}
+	</style>
+
+	<script is:inline>
+		// Resolve each swatch's actual computed hex/rgba and render alongside the role.
+		// Runs client-side so the page always reflects the live token value.
+		document.querySelectorAll('[data-hex-of]').forEach((el) => {
+			const token = el.getAttribute('data-hex-of');
+			const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+			el.textContent = value || '(unresolved)';
+		});
+	</script>
+</Layout>

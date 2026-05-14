@@ -1,0 +1,11 @@
+[Unit]
+Description=Truss demo receipt cleanup (7-day retention)
+Documentation=https://github.com/trusslabs/truss-labs
+
+[Service]
+Type=oneshot
+User=truss
+Group=truss
+ExecStart=/opt/truss/truss-labs/examples/deploy/gcp/cleanup-old-receipts.sh
+Environment=TRUSS_RECEIPTS_DIR=/var/truss/receipts
+Environment=TRUSS_RECEIPT_RETENTION_DAYS=7

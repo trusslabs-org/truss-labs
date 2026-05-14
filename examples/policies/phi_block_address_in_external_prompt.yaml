@@ -1,0 +1,14 @@
+schema_version: "1.0"
+policy_id: phi_block_address_in_external_prompt
+policy_version: v1.0
+match:
+  direction: prompt
+  destination: external_vendor
+  classes:
+    any_of:
+      - phi:patient_address
+verdict: block
+block_config:
+  user_message: "Patient address detected in a prompt headed to an external vendor. Blocked per HIPAA review. Contact compliance to request an exception."
+audit_only: false
+on_classifier_error: fail_open

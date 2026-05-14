@@ -1,0 +1,65 @@
+/* tokens.css — Truss design system v1, ref + sys layers
+ * Spec: docs/research/DESIGN_SYSTEM_v1.md §3
+ * Pass 1: introduces indirection only. No visual change vs. inline @theme.
+ */
+
+:root {
+  /* ─── reference layer (raw values) ──────────────────────────────── */
+
+  /* color — surface */
+  --ref-color-bg-0:        #0a0a0a;  /* page background */
+  --ref-color-bg-1:        #141414;  /* raised surface */
+  --ref-color-bg-2:        #1c1c1c;  /* nested / surface-variant */
+
+  /* color — text */
+  --ref-color-text-0:      #e0e0e0;  /* primary text */
+  --ref-color-text-1:      #888888;  /* dim / secondary text */
+
+  /* color — accent */
+  --ref-color-accent:      #f96;     /* coral, brand accent */
+
+  /* color — status */
+  --ref-color-status-ok:   #4ade80;  /* allowed, success */
+  --ref-color-status-warn: #fbbf24;  /* redacted, caution */
+  --ref-color-status-err:  #ef4444;  /* blocked, error — red-500 to separate from coral */
+
+  /* typography */
+  --ref-font-mono:         "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ─── system layer (semantic) ───────────────────────────────────── */
+
+  /* surface */
+  --sys-color-bg:                 var(--ref-color-bg-0);
+  --sys-color-surface:            var(--ref-color-bg-1);
+  --sys-color-surface-variant:    var(--ref-color-bg-2);
+
+  /* text */
+  --sys-color-text:               var(--ref-color-text-0);
+  --sys-color-text-dim:           var(--ref-color-text-1);
+
+  /* accent + on-X */
+  --sys-color-accent:             var(--ref-color-accent);
+  --sys-color-on-accent:          var(--ref-color-bg-0);
+
+  /* status */
+  --sys-color-status-ok:          var(--ref-color-status-ok);
+  --sys-color-status-warn:        var(--ref-color-status-warn);
+  --sys-color-status-err:         var(--ref-color-status-err);
+
+  /* typography */
+  --sys-font-mono:                var(--ref-font-mono);
+}
+
+/* Tailwind 4 theme bridge — exposes sys tokens as utility namespaces
+ * (bg-bg, text-text, text-dim, text-accent, font-mono).
+ * Values are kept as raw hex to guarantee byte-identical Tailwind output
+ * versus the prior inline @theme block; the ref/sys layer above is the
+ * source of truth for hand-written CSS (e.g. examples/demo.html in Pass 2).
+ */
+@theme {
+  --font-mono: "JetBrains Mono", monospace;
+  --color-accent: #f96;
+  --color-bg: #0a0a0a;
+  --color-text: #e0e0e0;
+  --color-dim: #888;
+}

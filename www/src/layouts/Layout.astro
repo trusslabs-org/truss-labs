@@ -1,0 +1,64 @@
+---
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description = "AI activity visibility on infrastructure you control" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title} | Truss Labs</title>
+		<meta name="description" content={description} />
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+		<style is:global>
+			@import "tailwindcss";
+			@import "../styles/tokens.css";
+			:root {
+				background-color: var(--color-bg);
+				color: var(--color-text);
+				font-family: var(--font-mono);
+			}
+			body {
+				@apply p-6 md:p-12 max-w-4xl mx-auto;
+			}
+			h1, h2, h3 {
+				@apply font-bold tracking-tight;
+			}
+			a {
+				@apply text-accent hover:underline decoration-1 underline-offset-4;
+			}
+		</style>
+	</head>
+	<body class="bg-bg text-text selection:bg-accent selection:text-bg">
+		<header class="mb-16 border-b border-white/10 pb-8 flex justify-between items-end">
+			<div>
+				<h1 class="text-2xl text-accent"><a href="/" class="hover:no-underline text-accent">Truss Labs Inc.</a></h1>
+				<p class="text-dim text-sm mt-1">{description}</p>
+			</div>
+			<nav class="flex gap-6 text-sm">
+				<a href="/blog">Blog</a>
+				<a href="/governance">Governance</a>
+				<a href="mailto:contact@trusslabs.org">Contact</a>
+			</nav>
+		</header>
+		<main>
+			<slot />
+		</main>
+		<footer class="mt-24 pt-8 border-t border-white/10 text-dim text-xs flex flex-col md:flex-row justify-between gap-4">
+			<div class="flex items-center gap-2">
+				<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
+				System Status: Operational [Brooklyn, NY]
+			</div>
+			<div>&copy; {new Date().getFullYear()} Truss Labs Inc.</div>
+		</footer>
+	</body>
+</html>
