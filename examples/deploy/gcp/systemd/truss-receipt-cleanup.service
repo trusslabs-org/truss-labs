@@ -1,6 +1,6 @@
 [Unit]
 Description=Truss demo receipt cleanup (7-day retention)
-Documentation=https://github.com/trusslabs/truss-labs
+Documentation=https://github.com/trusslabs-org/truss-labs
 
 [Service]
 Type=oneshot

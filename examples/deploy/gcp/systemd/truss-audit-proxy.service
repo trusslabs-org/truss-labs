@@ -1,6 +1,6 @@
 [Unit]
 Description=Truss Audit Proxy
-Documentation=https://github.com/trusslabs/truss-labs
+Documentation=https://github.com/trusslabs-org/truss-labs
 After=network-online.target
 Wants=network-online.target
 
