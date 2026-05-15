@@ -1,0 +1,76 @@
+{
+  "actor": {
+    "auth_method": "saml_sso",
+    "department": "health_services",
+    "user_id": "alice@example.com",
+    "user_role": "analyst"
+  },
+  "data_classes_touched": [
+    {
+      "class": "phi:patient_dob",
+      "in_prompt": false,
+      "in_response": true,
+      "instances": 1
+    }
+  ],
+  "downstream_actions": [],
+  "evidence": {
+    "capture_method": "http_proxy_intercept",
+    "captured_by": "truss-audit-pipeline-v0.1",
+    "receipt_hash": "sha256:6bfaee4d8000d5246e73ce1556745e4ad1ad87a727b9047542dabc3c73d17b48",
+    "signature": null
+  },
+  "external_trace_uri": null,
+  "policy_decisions": [
+    {
+      "alert_id": null,
+      "enforcement_mode": "enforced",
+      "error_reason": null,
+      "evaluated_at": "2026-05-15T16:00:00Z",
+      "matched_classes": [
+        "phi:patient_dob"
+      ],
+      "policy_id": "phi_redact_dob_in_response",
+      "policy_set_version": "sample-policy-set-v1",
+      "policy_version": "v1.0",
+      "redactions_applied": [
+        {
+          "after_hash": "sha256:9eaeb1ccc9155bfb3444cb8ad4b0883f27c90563c25539b412f900a355ab3e58",
+          "before_hash": "sha256:67e83c0dc1c7d421a76645f156a61cce841fa53a6efb25b31c6030d48f5c8583",
+          "location": "response"
+        }
+      ],
+      "verdict": "redacted",
+      "would_have_blocked": null
+    }
+  ],
+  "prompt": {
+    "context_references": [],
+    "text": "Summarize this chart note.",
+    "text_hash": "sha256:4fd5cd7ab8bff035ddaae120ca1fd36ad047ab799384e540ef8599baf218c95d",
+    "text_length_chars": 26
+  },
+  "receipt_id": "rcp_2026-05-15T12-55-04_579906",
+  "response": {
+    "latency_ms": null,
+    "text": "The chart note references [REDACTED:phi:patient_dob] and elevated A1C.",
+    "text_hash": "sha256:a53c60811cfc52c005a43513aa51826e9e71777751a928087dcb77f7b801814a",
+    "text_length_chars": 70,
+    "tokens_used": null
+  },
+  "retention": {
+    "deletable_after": "2033-05-13T12:55:04.701843+00:00",
+    "legal_hold": false,
+    "retain_until": "2033-05-13",
+    "retention_policy": "sample_seven_year"
+  },
+  "schema_version": "1.1",
+  "timestamp": "2026-05-15T12:55:04.701843Z",
+  "tool": {
+    "endpoint": "generativelanguage.googleapis.com/v1beta",
+    "model_id": "gemini-3-flash-preview",
+    "model_vendor": "google",
+    "tool_id": "internal_chat_assistant",
+    "tool_version": "demo-v1"
+  }
+}

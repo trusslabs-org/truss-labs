@@ -173,7 +173,7 @@
   </div>
 
   <h1>Truss Audit Proxy</h1>
-  <p>Truss sits between an agent and an LLM. Every call passes through a YAML policy that can allow, redact, or block — and every call writes a signed receipt to disk. The receipt is what your auditor reads, not the chat log.</p>
+  <p>Truss sits between an agent and an LLM. Every call passes through a YAML policy that can allow, redact, or block — and every call writes a hash-verifiable receipt to disk. The receipt is what your auditor reads, not the chat log.</p>
   <p class="sub">Flow: prompt → classifier → policy → LLM → receipt. The verdict and receipt path below are produced server-side from your YAML rules.</p>
 
   <label for="endpoint">Proxy endpoint</label>
@@ -214,7 +214,7 @@
     </ol>
 
     <h2>What's in a receipt</h2>
-    <p>A JSON record with: actor, destination, classifier tags, policy set version, verdict, redactions applied, prompt + response hashes, timestamp. No prompt or response body — the receipt is for audit, not replay.</p>
+    <p>A JSON record with: actor, destination, classifier tags, policy set version, verdict, redactions applied, prompt + response text and hashes, timestamp. Blocked prompts are stored in the receipt so an auditor can see what was attempted; retention policy protects that audit log over time.</p>
 
     <h2>What this is not</h2>
     <ul>

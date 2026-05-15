@@ -27,6 +27,7 @@ www/.astro/
 __pycache__/
 *.pyc
 .pytest_cache/
+*.egg-info/
 .venv/
 venv/
 

@@ -1,6 +1,6 @@
 # Truss Labs
 
-Truss is an audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a signed JSON receipt is written to disk. The pitch: DLP-style visibility for AI activity on sensitive data, on infrastructure you control.
+Truss is an audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a hash-verifiable JSON receipt is written to disk. The pitch: DLP-style visibility for AI activity on sensitive data, on infrastructure you control.
 
 **Live demo:** [demo.trusslabs.org](https://demo.trusslabs.org)
 **Site:** [trusslabs.org](https://trusslabs.org)
@@ -20,20 +20,29 @@ docs/           Specs and design docs
 ## Run the audit-proxy locally
 
 ```bash
-# 1. Install deps
+# 1. Install deps in a venv
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 
-# 2. Set your Gemini key
+# 2. Optional: set a Gemini key. Without one, the demo uses a deterministic stub.
 export GEMINI_API_KEY=...
 
 # 3. Start the proxy + demo page on localhost:8000
-export TRUSS_DEMO_HTML=examples/demo.html
-uvicorn primitives.audit.proxy:app --reload
+./examples/run_demo.sh
 
 # 4. Open http://localhost:8000
 ```
 
-Policies live in `examples/policies/`. The default config loads `examples/policies/demo.yaml`, which has three rules: a generic allow, a PHI block (try sending a patient address), and a PII redact.
+Policies live in `examples/policies/`. The demo loads the shipped PHI block and response-redaction rules, plus a synthetic allow decision when no rule matches.
+
+## Verify sample receipts
+
+```bash
+truss verify examples/receipts
+```
+
+The verifier recomputes each receipt hash by zeroing `evidence.receipt_hash`, canonicalizing the JSON, and comparing it to the stored SHA-256.
 
 ## Run the primitives against a real trace
 

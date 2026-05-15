@@ -1,0 +1,70 @@
+{
+  "actor": {
+    "auth_method": "saml_sso",
+    "department": "health_services",
+    "user_id": "alice@example.com",
+    "user_role": "analyst"
+  },
+  "data_classes_touched": [
+    {
+      "class": "phi:patient_address",
+      "in_prompt": true,
+      "in_response": false,
+      "instances": 1
+    }
+  ],
+  "downstream_actions": [],
+  "evidence": {
+    "capture_method": "http_proxy_intercept",
+    "captured_by": "truss-audit-pipeline-v0.1",
+    "receipt_hash": "sha256:12a0df8c14a94fbeafcfc536bdbc892e9326528540384ab51637fe62d8ac2c80",
+    "signature": null
+  },
+  "external_trace_uri": null,
+  "policy_decisions": [
+    {
+      "alert_id": null,
+      "enforcement_mode": "enforced",
+      "error_reason": null,
+      "evaluated_at": "2026-05-15T16:00:00Z",
+      "matched_classes": [
+        "phi:patient_address"
+      ],
+      "policy_id": "phi_block_address_in_external_prompt",
+      "policy_set_version": "sample-policy-set-v1",
+      "policy_version": "v1.0",
+      "redactions_applied": [],
+      "verdict": "blocked",
+      "would_have_blocked": null
+    }
+  ],
+  "prompt": {
+    "context_references": [],
+    "text": "Send a follow-up to patient John Smith at 1234 Maple Ave, Concord CA reminding him about his appointment.",
+    "text_hash": "sha256:0dd04a7eff08e4318cf358a3d058242ecc87feb92eb425f52e8c63f8f994c44e",
+    "text_length_chars": 105
+  },
+  "receipt_id": "rcp_2026-05-15T12-55-04_c685c8",
+  "response": {
+    "latency_ms": null,
+    "text": "",
+    "text_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text_length_chars": 0,
+    "tokens_used": null
+  },
+  "retention": {
+    "deletable_after": "2033-05-13T12:55:04.700729+00:00",
+    "legal_hold": false,
+    "retain_until": "2033-05-13",
+    "retention_policy": "sample_seven_year"
+  },
+  "schema_version": "1.1",
+  "timestamp": "2026-05-15T12:55:04.700729Z",
+  "tool": {
+    "endpoint": "generativelanguage.googleapis.com/v1beta",
+    "model_id": "gemini-3-flash-preview",
+    "model_vendor": "google",
+    "tool_id": "internal_chat_assistant",
+    "tool_version": "demo-v1"
+  }
+}

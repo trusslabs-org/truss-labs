@@ -1,0 +1,61 @@
+{
+  "actor": {
+    "auth_method": "saml_sso",
+    "department": "health_services",
+    "user_id": "alice@example.com",
+    "user_role": "analyst"
+  },
+  "data_classes_touched": [],
+  "downstream_actions": [],
+  "evidence": {
+    "capture_method": "http_proxy_intercept",
+    "captured_by": "truss-audit-pipeline-v0.1",
+    "receipt_hash": "sha256:4d341c39da738e279fafc81c0c3aedfbf5dc0861b075a3913278470334e0dab5",
+    "signature": null
+  },
+  "external_trace_uri": null,
+  "policy_decisions": [
+    {
+      "alert_id": null,
+      "enforcement_mode": "enforced",
+      "error_reason": null,
+      "evaluated_at": "2026-05-15T16:00:00Z",
+      "matched_classes": [],
+      "policy_id": null,
+      "policy_set_version": "sample-policy-set-v1",
+      "policy_version": null,
+      "redactions_applied": [],
+      "verdict": "allowed",
+      "would_have_blocked": null
+    }
+  ],
+  "prompt": {
+    "context_references": [],
+    "text": "Summarize the key changes in this quarter's IT operations report.",
+    "text_hash": "sha256:62c9047eb6710bb2c30e1e0f71441f88785880e8bee72b3bdac73e8d4d80e16a",
+    "text_length_chars": 65
+  },
+  "receipt_id": "rcp_2026-05-15T12-55-04_e49ce8",
+  "response": {
+    "latency_ms": null,
+    "text": "The quarter centered on help desk response time, endpoint patching, and cloud cost review.",
+    "text_hash": "sha256:6e72bec9b0f6ac4dc7000a9202996281677581cb12657eeb5af5733c60441e59",
+    "text_length_chars": 90,
+    "tokens_used": null
+  },
+  "retention": {
+    "deletable_after": "2033-05-13T12:55:04.632380+00:00",
+    "legal_hold": false,
+    "retain_until": "2033-05-13",
+    "retention_policy": "sample_seven_year"
+  },
+  "schema_version": "1.1",
+  "timestamp": "2026-05-15T12:55:04.632380Z",
+  "tool": {
+    "endpoint": "generativelanguage.googleapis.com/v1beta",
+    "model_id": "gemini-3-flash-preview",
+    "model_vendor": "google",
+    "tool_id": "internal_chat_assistant",
+    "tool_version": "demo-v1"
+  }
+}
