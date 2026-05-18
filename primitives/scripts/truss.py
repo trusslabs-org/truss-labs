@@ -21,48 +21,57 @@ try:
 except (AttributeError, ValueError):
     pass
 
-DEFAULT_RECEIPTS_DIR = Path("~/.truss/ledger/receipts").expanduser()
+TRUSS_DIR = Path("~/.truss").expanduser()
+DEFAULT_RECEIPTS_DIR = TRUSS_DIR / "ledger/receipts"
+VENV_DIR = TRUSS_DIR / "venv"
+VENV_PYTHON = VENV_DIR / "bin" / "python3"
 DEFAULT_PROXY_PORT = 8000
 
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-def ensure_dependencies(packages):
+def ensure_bootstrap(packages=None):
     """
-    Surgically install missing dependencies via pip.
+    Ensures we are running in the private Truss venv and dependencies are installed.
     """
-    missing = []
-    for pkg in packages:
-        # Map import name to pip package name if different
-        install_name = pkg
-        import_name = pkg
-        if ":" in pkg:
-            import_name, install_name = pkg.split(":")
-        
-        try:
-            importlib.import_module(import_name)
-        except ImportError:
-            missing.append(install_name)
+    packages = packages or []
     
-    if not missing:
+    # 1. Check if we are already running inside our private venv
+    if str(sys.executable) == str(VENV_PYTHON):
+        # We are inside. Check if specific packages are missing and install if so.
+        missing = []
+        for pkg in packages:
+            import_name = pkg.split(":")[0] if ":" in pkg else pkg
+            try:
+                importlib.import_module(import_name)
+            except ImportError:
+                missing.append(pkg.split(":")[1] if ":" in pkg else pkg)
+        
+        if missing:
+            print(f"🛡️ Truss: Adding dependencies to venv ({', '.join(missing)})...")
+            subprocess.check_call([str(VENV_PYTHON), "-m", "pip", "install"] + missing)
         return
 
-    print(f"🛡️ Truss: Missing dependencies found ({', '.join(missing)})")
-    print(f"🛡️ Bootstrapping environment...")
+    # 2. Not in venv. Does it exist?
+    if not VENV_PYTHON.exists():
+        print(f"🛡️ Truss: Initializing private environment at {VENV_DIR}...")
+        TRUSS_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.check_call([sys.executable, "-m", "venv", str(VENV_DIR)])
+        # Update pip immediately
+        subprocess.check_call([str(VENV_PYTHON), "-m", "pip", "install", "--upgrade", "pip", "setuptools"])
+
+    # 3. Always ensure basic dependencies are in the venv before we re-exec
+    # This avoids a re-exec loop if a command needs something basic.
+    base_deps = ["fastapi", "uvicorn", "httpx", "pyyaml", "pydantic"]
     
-    try:
-        # Check if we are in a venv
-        is_venv = sys.prefix != sys.base_prefix
-        pip_cmd = [sys.executable, "-m", "pip", "install"]
-        if not is_venv:
-            print("⚠️ Warning: Not running in a virtual environment. Installation might require permissions.")
-        
-        subprocess.check_call(pip_cmd + missing)
-        print(f"🛡️ Bootstrapping complete. Continuing...\n")
-    except Exception as e:
-        print(f"❌ Error: Failed to install dependencies: {e}", file=sys.stderr)
-        print(f"Please install manually: pip install {' '.join(missing)}", file=sys.stderr)
-        sys.exit(1)
+    # Merge with command-specific packages
+    all_to_install = list(set(base_deps + [p.split(":")[1] if ":" in p else p for p in packages]))
+    
+    # Re-exec into the venv
+    print(f"🛡️ Truss: Entering isolated environment...")
+    
+    # We pass the current script path and all arguments
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), __file__] + sys.argv[1:])
 
 # --- Receipt Commands ---
 
@@ -115,7 +124,7 @@ def cmd_verify(args):
         sys.exit(1)
 
 def cmd_query(args):
-    ensure_dependencies(["duckdb"])
+    ensure_bootstrap(["duckdb"])
     import duckdb
     path = Path(args.path).expanduser()
     json_pattern = str(path / "**" / "*.json")
@@ -128,7 +137,7 @@ def cmd_query(args):
         sys.exit(1)
 
 def cmd_report(args):
-    ensure_dependencies(["duckdb"])
+    ensure_bootstrap(["duckdb"])
     import duckdb
     path = Path(args.path).expanduser()
     json_pattern = str(path / "**" / "*.json")
@@ -192,7 +201,7 @@ def cmd_exec(args):
     """
     truss exec [options] -- command args...
     """
-    # 1. Parse manual options since argparse.REMAINDER is finicky
+    # Parse manual options
     policy = None
     port = DEFAULT_PROXY_PORT
     command = []
@@ -210,7 +219,6 @@ def cmd_exec(args):
             command = args[i+1:]
             break
         else:
-            # First non-option is the start of the command if no --
             command = args[i:]
             break
     
@@ -218,9 +226,7 @@ def cmd_exec(args):
         print("Error: No command provided to exec.")
         sys.exit(1)
 
-    # Surgical Dependency Check
-    ensure_dependencies(["fastapi", "uvicorn", "httpx", "yaml:pyyaml", "pydantic"])
-
+    # We are already in venv if we reached here due to ensure_bootstrap in main()
     proxy_proc = None
     if not is_port_open(port):
         print(f"🛡️ Starting Truss Audit Proxy on port {port}...")
@@ -277,44 +283,47 @@ def cmd_exec(args):
             print("🛡️ Truss Audit Proxy stopped.")
 
 def main():
-    # If first arg is 'exec', handle it manually to avoid argparse subparser issues with REMAINDER
+    # If first arg is 'exec', bootstrap and re-exec
     if len(sys.argv) > 1 and sys.argv[1] == "exec":
+        ensure_bootstrap()
         cmd_exec(sys.argv[2:])
         return
 
+    # For other commands, we might not need the venv yet, 
+    # but let's make it consistent.
     parser = argparse.ArgumentParser(prog="truss")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_index = subparsers.add_parser("index", help="Index receipts")
+    p_index = subparsers.add_parser("index")
     p_index.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
 
-    p_verify = subparsers.add_parser("verify", help="Verify receipt hashes")
+    p_verify = subparsers.add_parser("verify")
     p_verify.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
     p_verify.add_argument("--allow-empty", action="store_true")
 
-    p_query = subparsers.add_parser("query", help="Query receipts using SQL (DuckDB)")
-    p_query.add_argument("sql", help="SQL query. Use 'receipts' as the table name.")
+    p_query = subparsers.add_parser("query")
+    p_query.add_argument("sql")
     p_query.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_report = subparsers.add_parser("report", help="Generate audit report")
+    p_report = subparsers.add_parser("report")
     p_report.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_translate = subparsers.add_parser("translate", help="Translate hooks.jsonl to TWP nodes")
+    p_translate = subparsers.add_parser("translate")
     p_translate.add_argument("input", nargs="?", default="-")
     p_translate.add_argument("output", nargs="?", default="-")
 
-    p_analyze = subparsers.add_parser("analyze", help="Analyze trace nodes for flags")
+    p_analyze = subparsers.add_parser("analyze")
     p_analyze.add_argument("trace", nargs="?", default="-")
-    p_analyze.add_argument("--type", help="Filter by node type")
-    p_analyze.add_argument("--flag", help="Filter by audit flag")
-    p_analyze.add_argument("--id", help="Filter by node ID")
-    p_analyze.add_argument("--json", action="store_true", help="Emit JSONL")
+    p_analyze.add_argument("--type")
+    p_analyze.add_argument("--flag")
+    p_analyze.add_argument("--id")
+    p_analyze.add_argument("--json", action="store_true")
 
-    p_trap = subparsers.add_parser("trap", help="Manage and run audit traps")
+    p_trap = subparsers.add_parser("trap")
     p_trap.add_argument("trap_command", choices=["add", "clear", "list", "run"])
-    p_trap.add_argument("--on", help="Trap condition (e.g. ON_RETRY)")
-    p_trap.add_argument("--action", help="Trap action (e.g. ACTION_HALT)")
-    p_trap.add_argument("--project", help="Project name")
+    p_trap.add_argument("--on")
+    p_trap.add_argument("--action")
+    p_trap.add_argument("--project")
 
     args = parser.parse_args()
 
@@ -327,5 +336,9 @@ def main():
     elif args.command == "trap": cmd_trap(args)
 
 if __name__ == "__main__":
+    # Ensure local primitives are importable
+    repo_root = Path(__file__).parent.parent.parent
+    sys.path.append(str(repo_root))
     sys.path.append(str(Path(__file__).parent))
+    
     main()
