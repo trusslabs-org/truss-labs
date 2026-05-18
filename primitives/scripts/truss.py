@@ -238,6 +238,47 @@ def is_port_open(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
+def cmd_kill(args):
+    """
+    truss kill [--port N] — stop any Truss Audit Proxy bound to the port.
+
+    Useful when iterating on proxy code: `truss exec` reuses an already-running
+    proxy and won't pick up source changes until the existing process exits.
+    """
+    port = args.port or DEFAULT_PROXY_PORT
+    if not is_port_open(port):
+        print(f"🛡️ No Truss Audit Proxy running on port {port}.")
+        return
+    try:
+        out = subprocess.check_output(["lsof", "-ti", f":{port}"], text=True).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Error: could not locate process on port {port}: {e}", file=sys.stderr)
+        sys.exit(1)
+    pids = [int(p) for p in out.splitlines() if p.strip()]
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            print(f"🛡️ Sent SIGTERM to pid {pid}")
+        except ProcessLookupError:
+            pass
+    # Give it a moment to exit cleanly, then SIGKILL stragglers
+    for _ in range(15):
+        if not is_port_open(port):
+            break
+        time.sleep(0.1)
+    if is_port_open(port):
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+                print(f"🛡️ Force-killed pid {pid}")
+            except ProcessLookupError:
+                pass
+        time.sleep(0.2)
+    if is_port_open(port):
+        print(f"Warning: port {port} still bound after kill attempt", file=sys.stderr)
+        sys.exit(1)
+    print(f"🛡️ Truss Audit Proxy stopped (port {port}).")
+
 def cmd_exec(args):
     """
     truss exec [options] -- command args...
@@ -429,6 +470,7 @@ def main():
         subparsers.add_parser("translate", help="Translate logs to TWP nodes")
         subparsers.add_parser("analyze", help="Analyze trace nodes")
         subparsers.add_parser("trap", help="Manage audit traps")
+        subparsers.add_parser("kill", help="Stop a running Truss Audit Proxy")
         parser.print_help()
         return
 
@@ -481,10 +523,13 @@ def main():
     p_exec.add_argument("--port", type=int, help="Proxy port (default 8000)")
     p_exec.add_argument("command_to_run", nargs=argparse.REMAINDER, help="Command to run")
 
+    p_kill = subparsers.add_parser("kill", help="Stop a running Truss Audit Proxy")
+    p_kill.add_argument("--port", type=int, help="Proxy port (default 8000)")
+
     args = parser.parse_args()
 
-    # Ensure full bootstrap (venv check) for standard commands too
-    if args.command != "install":
+    # Pure process-control commands don't need the venv bootstrap.
+    if args.command not in ("install", "kill"):
         ensure_bootstrap()
 
     if args.command == "install": cmd_install(args)
@@ -495,6 +540,7 @@ def main():
     elif args.command == "translate": cmd_translate(args)
     elif args.command == "analyze": cmd_analyze(args)
     elif args.command == "trap": cmd_trap(args)
+    elif args.command == "kill": cmd_kill(args)
     elif args.command == "exec":
         cmd_exec(args)
 

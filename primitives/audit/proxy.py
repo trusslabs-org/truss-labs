@@ -451,11 +451,13 @@ def _handle_chat(
 
 
 def _extract_prompt_from_genai_body(body: Dict[str, Any]) -> str:
-    """Flatten a Gemini generateContent body into the single string our policy expects.
+    """Flatten a Gemini generateContent body into the string our policy classifies.
 
-    Captures systemInstruction + every text part across all contents. Non-text parts
-    (inlineData, fileData, functionCall, etc.) are skipped — policy on those is a
-    separate problem.
+    Captures systemInstruction (always — it's the developer-set scaffold) plus
+    text parts from only the LAST role=user content. Prior turns were already
+    audited when they happened; re-classifying them on every subsequent turn
+    poisons the conversation once any PHI appears. The full body still gets
+    forwarded upstream so multi-turn context survives.
     """
     chunks: List[str] = []
     sys_inst = body.get("systemInstruction") or body.get("system_instruction")
@@ -464,13 +466,14 @@ def _extract_prompt_from_genai_body(body: Dict[str, Any]) -> str:
             t = part.get("text") if isinstance(part, dict) else None
             if t:
                 chunks.append(t)
-    for content in body.get("contents", []) or []:
-        if not isinstance(content, dict):
+    for content in reversed(body.get("contents", []) or []):
+        if not isinstance(content, dict) or content.get("role") != "user":
             continue
         for part in content.get("parts", []) or []:
             t = part.get("text") if isinstance(part, dict) else None
             if t:
                 chunks.append(t)
+        break
     return "\n\n".join(chunks).strip()
 
 
@@ -750,8 +753,11 @@ async def _gemini_run(
 def _extract_prompt_from_anthropic_body(body: Dict[str, Any]) -> str:
     """Flatten an Anthropic Messages body into text for policy classification.
 
-    Captures the `system` field plus every text block across all messages.
-    Non-text blocks (image, tool_use, tool_result) are skipped.
+    Captures the `system` field (always — developer-set scaffold) plus text
+    blocks from only the LAST role=user message. Prior turns were already
+    audited when they happened; re-classifying them on every subsequent turn
+    poisons the conversation once any PHI appears. The full body still gets
+    forwarded upstream so multi-turn context survives.
     """
     chunks: List[str] = []
     system = body.get("system")
@@ -763,8 +769,8 @@ def _extract_prompt_from_anthropic_body(body: Dict[str, Any]) -> str:
                 t = block.get("text")
                 if t:
                     chunks.append(t)
-    for msg in body.get("messages", []) or []:
-        if not isinstance(msg, dict):
+    for msg in reversed(body.get("messages", []) or []):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
             continue
         content = msg.get("content")
         if isinstance(content, str):
@@ -775,6 +781,7 @@ def _extract_prompt_from_anthropic_body(body: Dict[str, Any]) -> str:
                     t = block.get("text")
                     if t:
                         chunks.append(t)
+        break
     return "\n\n".join(chunks).strip()
 
 
