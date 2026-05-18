@@ -13,9 +13,10 @@ import subprocess
 import time
 import socket
 import importlib
+import shutil
 from pathlib import Path
 
-VERSION = "0.1.7"
+VERSION = "0.1.9"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -294,9 +295,6 @@ def cmd_exec(args):
     else:
         print(f"🛡️ Using existing Truss Audit Proxy on port {port}.")
 
-    print(f"🛡️ Truss Governance Active (Policy: {policy or 'default'})")
-    print(f"🛡️ Executing: {' '.join(command)}")
-    
     # 2. Prepare Environment
     env = os.environ.copy()
     proxy_url = f"http://localhost:{port}"
@@ -304,6 +302,21 @@ def cmd_exec(args):
     env["HTTPS_PROXY"] = proxy_url
     env["http_proxy"] = proxy_url
     env["https_proxy"] = proxy_url
+    
+    # Inject paths for local agent discovery
+    local_bin = str(Path("~/.local/bin").expanduser())
+    truss_bin = str(TRUSS_DIR / "bin")
+    current_path = env.get("PATH", "")
+    new_path = f"{local_bin}:{truss_bin}:{current_path}"
+    env["PATH"] = new_path
+    
+    # Resolve the executable path manually to ensure it's found
+    executable = shutil.which(command[0], path=new_path)
+    if executable:
+        command[0] = executable
+
+    print(f"🛡️ Truss Governance Active (Policy: {policy or 'default'})")
+    print(f"🛡️ Executing: {' '.join(command)}")
     
     # 3. Run the command
     try:

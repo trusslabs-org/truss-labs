@@ -3,7 +3,7 @@ set -e
 REPO_ROOT=$(pwd)
 BUILD_DIR="tmp/truss-primitives"
 TARGET_DIR="www/public/demo"
-VERSION="0.1.7"
+VERSION="0.1.9"
 TARBALL="truss-primitives-v$VERSION.tar.gz"
 
 echo "Building $TARBALL..."

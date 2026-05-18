@@ -7,7 +7,7 @@ echo "🛡️ Initializing Truss installation..."
 TRUSS_HOME="$HOME/.truss"
 BIN_DIR="$TRUSS_HOME/bin"
 PRIMITIVES_DIR="$TRUSS_HOME/primitives"
-VERSION="0.1.7"
+VERSION="0.1.9"
 TARBALL_URL="https://trusslabs.org/demo/truss-primitives-v$VERSION.tar.gz"
 
 # 1. Create directory structure
