@@ -15,7 +15,7 @@ import socket
 import importlib
 from pathlib import Path
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -43,7 +43,7 @@ def ensure_bootstrap(packages=None):
     """
     Ensures we are running in the private Truss venv and dependencies are installed.
     """
-    # Always ensure directories exist before doing anything
+    # Always ensure directories exist 
     bootstrap_ledger()
     
     packages = packages or []
@@ -75,9 +75,6 @@ def ensure_bootstrap(packages=None):
     # 3. Always ensure basic dependencies are in the venv before we re-exec
     base_deps = ["fastapi", "uvicorn", "httpx", "pyyaml", "pydantic"]
     
-    # Merge with command-specific packages
-    all_to_install = list(set(base_deps + [p.split(":")[1] if ":" in p else p for p in packages]))
-    
     # Re-exec into the venv
     print(f"🛡️ Truss: Entering isolated environment...")
     
@@ -90,11 +87,9 @@ def cmd_install(args):
     """
     Installs the truss CLI to ~/.local/bin and bootstraps the ledger.
     """
-    # 1. Create Ledger Structure
     print(f"🛡️ Bootstrapping Truss Ledger at {LEDGER_DIR}...")
     bootstrap_ledger()
     
-    # 2. Install Binary
     bin_dir = Path("~/.local/bin").expanduser()
     bin_dir.mkdir(parents=True, exist_ok=True)
     dest = bin_dir / "truss"
@@ -270,7 +265,6 @@ def cmd_exec(args):
         print("Error: No command provided to exec.")
         sys.exit(1)
 
-    # We are already in venv if we reached here due to ensure_bootstrap in main()
     proxy_proc = None
     if not is_port_open(port):
         print(f"🛡️ Starting Truss Audit Proxy on port {port}...")
@@ -327,6 +321,11 @@ def cmd_exec(args):
             print("🛡️ Truss Audit Proxy stopped.")
 
 def main():
+    # MANDATORY: Bootstrap directories before anything else
+    # We don't call ensure_bootstrap() because it triggers re-exec/venv setup
+    # which we only want on actual commands. We just want the folders.
+    bootstrap_ledger()
+
     # If no arguments, print header and help
     if len(sys.argv) == 1:
         print(f"🛡️ Truss Audit Substrate (v{VERSION})")
@@ -397,8 +396,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Always ensure bootstrap on any command
-    ensure_bootstrap()
+    # Ensure full bootstrap (venv check) for standard commands too
+    if args.command != "install":
+        ensure_bootstrap()
 
     if args.command == "install": cmd_install(args)
     elif args.command == "index": cmd_index(args)
