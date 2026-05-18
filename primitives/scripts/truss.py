@@ -15,6 +15,8 @@ import socket
 import importlib
 from pathlib import Path
 
+VERSION = "0.1.2"
+
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -61,17 +63,35 @@ def ensure_bootstrap(packages=None):
         subprocess.check_call([str(VENV_PYTHON), "-m", "pip", "install", "--upgrade", "pip", "setuptools"])
 
     # 3. Always ensure basic dependencies are in the venv before we re-exec
-    # This avoids a re-exec loop if a command needs something basic.
     base_deps = ["fastapi", "uvicorn", "httpx", "pyyaml", "pydantic"]
-    
-    # Merge with command-specific packages
-    all_to_install = list(set(base_deps + [p.split(":")[1] if ":" in p else p for p in packages]))
     
     # Re-exec into the venv
     print(f"🛡️ Truss: Entering isolated environment...")
     
     # We pass the current script path and all arguments
     os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), __file__] + sys.argv[1:])
+
+# --- System Commands ---
+
+def cmd_install(args):
+    """
+    Installs the truss CLI to ~/.local/bin
+    """
+    bin_dir = Path("~/.local/bin").expanduser()
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    dest = bin_dir / "truss"
+    
+    src = Path(__file__).absolute()
+    
+    if dest.exists() or dest.is_symlink():
+        dest.unlink()
+    
+    os.symlink(src, dest)
+    dest.chmod(0o755)
+    
+    print(f"🛡️ Truss CLI installed to {dest}")
+    print(f"🛡️ Make sure {bin_dir} is in your PATH.")
+    print(f"   Run: export PATH=\"$PATH:{bin_dir}\"")
 
 # --- Receipt Commands ---
 
@@ -296,7 +316,10 @@ def main():
         return
 
     parser = argparse.ArgumentParser(prog="truss")
+    parser.add_argument("--version", action="version", version=f"truss {VERSION}")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    p_install = subparsers.add_parser("install", help="Install truss CLI to ~/.local/bin")
 
     p_index = subparsers.add_parser("index", help="Index receipts")
     p_index.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
@@ -329,7 +352,7 @@ def main():
     p_trap.add_argument("--action")
     p_trap.add_argument("--project")
 
-    # This parser is mostly for help documentation, as main() handles 'exec' manually above
+    # Documentation only
     p_exec = subparsers.add_parser("exec", help="Run a command under Truss governance")
     p_exec.add_argument("--policy", help="Path to policy YAML file")
     p_exec.add_argument("--port", type=int, help="Proxy port (default 8000)")
@@ -337,7 +360,8 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "index": cmd_index(args)
+    if args.command == "install": cmd_install(args)
+    elif args.command == "index": cmd_index(args)
     elif args.command == "verify": cmd_verify(args)
     elif args.command == "query": cmd_query(args)
     elif args.command == "report": cmd_report(args)
@@ -345,8 +369,6 @@ def main():
     elif args.command == "analyze": cmd_analyze(args)
     elif args.command == "trap": cmd_trap(args)
     elif args.command == "exec":
-        # This branch is reached if somebody runs 'python3 truss.py exec' 
-        # when ALREADY in the venv.
         cmd_exec(args)
 
 if __name__ == "__main__":
