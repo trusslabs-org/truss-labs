@@ -71,7 +71,7 @@ def emit_pretty(results, node_index):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Query a Sovereign Trace Log.")
+    parser = argparse.ArgumentParser(description="Query a Truss Trace Log.")
     parser.add_argument("trace", nargs="?", default="-",
                         help="Path to a .jsonl trace file, or '-' / omitted to read stdin")
     parser.add_argument("--type", help="Filter by node type (e.g., NODE_LOGIC, NODE_TOOL)")

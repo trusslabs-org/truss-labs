@@ -95,7 +95,7 @@ beats:
         semantically confusable with model output — the distinction is
         preserved in the graph forever.
       enterprise: |
-        The operator corrects the agent's state under soul-lock. The
+        The operator corrects the agent's state under truss-lock. The
         correction is attributable — who wrote it, when, why. Operator
         overrides are never indistinguishable from model outputs. This is
         the compliance posture: every decision in the transcript can be

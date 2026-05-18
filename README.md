@@ -9,7 +9,7 @@ Truss is an audit and policy layer that sits in front of LLM and agent APIs. Eve
 
 ```
 primitives/     Audit-proxy (FastAPI), policy engine, classifier, receipt writer
-                + Unix-style CLIs that compose with pipes (soul_query, soul_trap, soul_translate)
+                + Unified 'truss' CLI for receipt verification and trace analysis
 www/            trusslabs.org (Astro static site)
 examples/       Sample policies, a local demo page, a GCP deploy runbook
 demo/           Asciinema casts of the primitives running against real session traces
@@ -36,7 +36,11 @@ export GEMINI_API_KEY=...
 
 Policies live in `examples/policies/`. The demo loads the shipped PHI block and response-redaction rules, plus a synthetic allow decision when no rule matches.
 
-## Verify sample receipts
+## The Truss CLI
+
+The `truss` CLI is the Swiss Army knife for auditing AI agents.
+
+### Verify sample receipts
 
 ```bash
 truss verify examples/receipts
@@ -44,14 +48,15 @@ truss verify examples/receipts
 
 The verifier recomputes each receipt hash by zeroing `evidence.receipt_hash`, canonicalizing the JSON, and comparing it to the stored SHA-256.
 
-## Run the primitives against a real trace
+### Run the primitives against a real trace
+
+Translate a session's hooks.jsonl into traceable nodes, find every retry loop, and halt if a trap is set:
 
 ```bash
-# Translate a session's hooks.jsonl into TWP-shaped nodes, find every retry loop:
 cat ~/.local/share/some-session/hooks.jsonl \
-  | python3 primitives/scripts/soul_translate.py \
-  | python3 primitives/scripts/soul_query.py --json --flag FLAG_CIRCULAR_REASONING \
-  | python3 primitives/scripts/soul_trap.py run
+  | truss translate \
+  | truss analyze --json --flag FLAG_CIRCULAR_REASONING \
+  | truss trap run
 ```
 
 A live recording: [trusslabs.org/demo/](https://trusslabs.org/) (asciinema embed under the "Show me" section).

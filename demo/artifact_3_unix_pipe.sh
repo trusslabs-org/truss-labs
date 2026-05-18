@@ -6,7 +6,7 @@
 #    compose, not a locked platform."
 #
 # One-liner:
-#   soul-query | soul-trap — a Unix sentence, not a SaaS workflow.
+#   truss analyze | truss trap — a Unix sentence, not a SaaS workflow.
 #
 # Clarity test:
 #   Two cold reviewers watch the recording and articulate, unprompted:
@@ -31,7 +31,7 @@
 #
 # 1. From repo root, in your own terminal (NOT through Claude's `!`):
 #      cd ~/Code/truss-labs
-#      export SOUL_PROJECT=truss-labs-310-demo
+#      export TRUSS_PROJECT=truss-labs-310-demo
 #      asciinema rec demo/artifact_3_unix_pipe.cast
 #
 # 2. Inside the recording shell, run:
@@ -64,9 +64,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-export SOUL_PROJECT="${SOUL_PROJECT:-truss-labs-310-demo}"
-python3 primitives/scripts/soul_trap.py clear > /dev/null
-python3 primitives/scripts/soul_trap.py add --on ON_RETRY --action ACTION_HALT > /dev/null
+export TRUSS_PROJECT="${TRUSS_PROJECT:-truss-labs-310-demo}"
+python3 primitives/scripts/truss_trap.py clear > /dev/null
+python3 primitives/scripts/truss_trap.py add --on ON_RETRY --action ACTION_HALT > /dev/null
 
 SESSION="$HOME/soul_registry/sessions/truss-labs/11810484-c02b-4497-9032-38dce49851d2"
 
@@ -100,7 +100,7 @@ run_step() {
 run_step "wc -l $SESSION/hooks.jsonl"
 
 # [0:04] Three primitives. One pipe. Find every retry loop.
-run_step "cat $SESSION/hooks.jsonl | python3 primitives/scripts/soul_translate.py | python3 primitives/scripts/soul_query.py --json --flag FLAG_CIRCULAR_REASONING 2>/dev/null | python3 primitives/scripts/soul_trap.py run 2>/dev/null | head -3"
+run_step "cat $SESSION/hooks.jsonl | python3 primitives/scripts/truss_translate.py | python3 primitives/scripts/truss_analyze.py --json --flag FLAG_CIRCULAR_REASONING 2>/dev/null | python3 primitives/scripts/truss_trap.py run 2>/dev/null | head -3"
 
 # [0:13] Final prompt — leave a clean trailing line so the cast ends well.
 printf '%s\n' "$PROMPT"

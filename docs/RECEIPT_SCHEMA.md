@@ -224,4 +224,7 @@ Every receipt carries `schema_version`. Migrations rewrite old receipts to a new
 - [`primitives/audit/schema.py`](../primitives/audit/schema.py) — code source of truth (TypedDicts + JSON Schema)
 - [`primitives/audit/receipt_writer.py`](../primitives/audit/receipt_writer.py) — atomic writer with schema validation
 - [`primitives/audit/tests/test_receipt_writer.py`](../primitives/audit/tests/test_receipt_writer.py) — examples of construction
+- [`../examples/receipts/`](../examples/receipts/) — static sample receipts for allowed / blocked / redacted paths
+- [`../examples/queries/`](../examples/queries/) — jq, DuckDB, and retention query examples
+- [`CPRA_WALKTHROUGH.md`](CPRA_WALKTHROUGH.md) — hypothetical California public-records workflow
 - [`SECURITY.md`](../SECURITY.md) — vulnerability disclosure

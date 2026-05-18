@@ -13,7 +13,7 @@ DEFAULT_PROJECT = "truss-labs"
 
 
 def _project() -> str:
-    return os.environ.get("SOUL_PROJECT", DEFAULT_PROJECT)
+    return os.environ.get("TRUSS_PROJECT", DEFAULT_PROJECT)
 
 
 def _traps_path() -> str:
@@ -58,7 +58,7 @@ def list_traps():
     if not traps:
         print(f"No active traps for project '{_project()}'.")
         return
-    print(f"--- ACTIVE SOUL TRAPS ({_project()}) ---")
+    print(f"--- ACTIVE TRUSS TRAPS ({_project()}) ---")
     for t in traps:
         print(f"[{t['id']}] On: {t['on']} | Action: {t['action']} | Status: {t['status']}")
 
@@ -93,7 +93,7 @@ def run_traps():
     """
     traps = [t for t in load_traps() if t.get("status") == "active"]
     if not traps:
-        print(f"[soul-trap] no active traps for '{_project()}'; nothing to evaluate.",
+        print(f"[truss-trap] no active traps for '{_project()}'; nothing to evaluate.",
               file=sys.stderr)
         return 0
 
@@ -124,7 +124,7 @@ def run_traps():
                 if trap["action"] == "ACTION_HALT":
                     halted = True
 
-    print(f"[soul-trap] evaluated against {len(traps)} trap(s); {match_count} match(es).",
+    print(f"[truss-trap] evaluated against {len(traps)} trap(s); {match_count} match(es).",
           file=sys.stderr)
     return 1 if halted else 0
 

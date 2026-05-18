@@ -15,12 +15,11 @@ We don't need better "Bots." We need **Exoskeletons for Intelligence.**
 ## The Administrative Foundation: Why NY C-Corp?
 Before writing code, we built the shield. I chose a **New York C-Corporation** for its low overhead during the pre-revenue R&D phase and its clear legal separation. We've established a "Zero-Profit" strategy for the first two years, allowing us to focus entirely on foundational primitives without the pressure of immediate commercialization.
 
-*   **DOS ID**: 7889395
 *   **Identity**: ilteris@trusslabs.org
-*   **Infrastructure**: Fully capitalized on Mercury with a "Clean Room" Google Cloud Organization.
+*   **Infrastructure**: Fully capitalized with a "Clean Room" Google Cloud Organization.
 
 ## The Technical Pivot: From Product to Infrastructure
-Truss Labs began with the idea of building an agent. But through our research into the **Soul OS**, we realized the market has a bigger gap: **Harness Integrity.**
+Truss Labs began with the idea of building an agent. But through our research into the **Truss CLI**, we realized the market has a bigger gap: **Harness Integrity.**
 
 Everyone is building cars (Agents), but nobody is building the crash-test lab. Truss Labs is that lab. 
 
@@ -34,9 +33,9 @@ It enables:
 
 ## The Roadmap
 Truss Labs is building in public. Our current sprints include:
-*   **Pillar I**: Industrialization of the Soul Kernel (Zenith v8.7+).
+*   **Pillar I**: Industrialization of the Truss Kernel (Zenith v8.7+).
 *   **Pillar II**: The Trace-Tree Interface (The Control Plane).
-*   **Pillar III**: Agentic Primitives (`soul-query`, `soul-trap`, `soul-ingest`).
+*   **Pillar III**: Agentic Primitives (`truss analyze`, `truss trap`, `truss ingest`).
 
 The goal is a **Sovereign Intelligence Platform** that can run on-premise, securely, and deterministically.
 

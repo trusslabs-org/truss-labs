@@ -22,9 +22,7 @@ I picked a New York C-Corp for clean legal separation and because it's the defau
 
 I also incorporated *before* writing much public code, which is probably earlier than strictly necessary. The reason is specific: I wanted the IP ownership clean from day one, so there's no ambiguity between "side project I did before forming the company" and "work that belongs to the company."
 
-- DOS ID: 7889395
 - Email: ilteris@trusslabs.org
-- Banking: Mercury
 - Cloud: Google Workspace, own-domain DNS
 
 No outside capital. Runway is personal for the first couple of years.
@@ -33,18 +31,18 @@ No outside capital. Runway is personal for the first couple of years.
 
 Honestly, not much that's public yet. What exists internally:
 
-1. **Soul Kernel** — a local shell harness that keeps agent state (sessions, tasks, traces) on disk in a format I can query with ordinary tools. Not a framework; more like a filesystem convention plus a few CLIs.
+1. **Truss Kernel** — a local shell harness that keeps agent state (sessions, tasks, traces) on disk in a format I can query with ordinary tools. Not a framework; more like a filesystem convention plus a few CLIs.
 2. **TWP (Truss Wire Protocol)** — a thin layer on top of Anthropic's [Model Context Protocol](https://modelcontextprotocol.io/) that adds branching and checkpointing. This is the piece I'm least sure about and most likely to rewrite.
-3. **Primitives** — `soul-query`, `soul-trap`, `soul-ingest`. Small CLI tools. `soul-trap` halts a run when confidence drops below a threshold; `soul-query` reads traces; `soul-ingest` loads context.
+3. **Primitives** — `truss analyze`, `truss trap`, `truss ingest`. Small CLI tools. `truss trap` halts a run when confidence drops below a threshold; `truss analyze` reads traces; `truss ingest` loads context.
 
 The Trace-Tree UI — a way to see a run as a tree you can branch and inspect — is sketched but not built.
 
-## What I'm unsure about
+## What'm unsure about
 
 A few things I don't have good answers to yet:
 
 - Whether TWP should exist at all, or whether MCP plus conventions is enough.
-- Whether the Soul Kernel should be a library, a daemon, or stay as a shell harness.
+- Whether the Truss Kernel should be a library, a daemon, or stay as a shell harness.
 - Who the first real users are. Right now it's just me.
 
 I'd rather write about those openly than pretend the roadmap is settled.

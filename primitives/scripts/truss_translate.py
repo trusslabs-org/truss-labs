@@ -1,16 +1,16 @@
 """
-soul_translate.py — convert ~/soul_registry/sessions/*/*/hooks.jsonl entries
-into TWP-shaped JSONL nodes that compose with soul_query / soul_trap.
+truss_translate.py — convert ~/truss_registry/sessions/*/*/hooks.jsonl entries
+into TWP-shaped JSONL nodes that compose with truss_query / truss_trap.
 
 Bridges the schema gap noted in task 310: native hooks.jsonl is a hooks-event
-log; the audit primitives (soul_query, soul_trap) want post-ingest TWP nodes
+log; the audit primitives (truss_query, truss_trap) want post-ingest TWP nodes
 with node_id / type / audit_flags. This translator is the "option (b)" 5-line
 primitive from that task's blocker — slightly more than 5 lines because audit-
 flag detection has to do real work.
 
 Usage:
-    soul_translate [input] [output]
-    cat hooks.jsonl | soul_translate | soul_query --json --flag FLAG_CRITICAL_FAILURE
+    truss_translate [input] [output]
+    cat hooks.jsonl | truss_translate | truss_query --json --flag FLAG_CRITICAL_FAILURE
 """
 import argparse
 import json
@@ -160,7 +160,7 @@ def translate(input_path, output_path):
             flags = _detect_flags(entry, outputs, sliding)
 
             # Field-name fallback: standard hook entries use {timestamp,
-            # operation}; /decision rows from soul_log_decision.py use
+            # operation}; /decision rows from truss_log_decision.py use
             # {ts, op}. Translator must accept both shapes.
             node = {
                 "timestamp": entry.get("timestamp") or entry.get("ts"),
