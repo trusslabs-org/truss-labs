@@ -55,6 +55,9 @@ The verifier recomputes each receipt hash by zeroing `evidence.receipt_hash`, ca
 ## Run the primitives against a real trace
 
 ```bash
+# Translate a session's hooks.jsonl into traceable nodes, find every retry loop:
+cat hooks.jsonl | truss translate | truss analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run
+```
 # Translate a session's hooks.jsonl into TWP-shaped nodes, find every retry loop:
 cat ~/.local/share/some-session/hooks.jsonl \
   | python3 primitives/scripts/soul_translate.py \

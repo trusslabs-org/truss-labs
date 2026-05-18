@@ -12,6 +12,7 @@ import os
 import subprocess
 import time
 import socket
+import importlib
 from pathlib import Path
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
@@ -20,16 +21,48 @@ try:
 except (AttributeError, ValueError):
     pass
 
-try:
-    import duckdb
-except ImportError:
-    duckdb = None
-
 DEFAULT_RECEIPTS_DIR = Path("~/.truss/ledger/receipts").expanduser()
 DEFAULT_PROXY_PORT = 8000
 
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+def ensure_dependencies(packages):
+    """
+    Surgically install missing dependencies via pip.
+    """
+    missing = []
+    for pkg in packages:
+        # Map import name to pip package name if different
+        install_name = pkg
+        import_name = pkg
+        if ":" in pkg:
+            import_name, install_name = pkg.split(":")
+        
+        try:
+            importlib.import_module(import_name)
+        except ImportError:
+            missing.append(install_name)
+    
+    if not missing:
+        return
+
+    print(f"🛡️ Truss: Missing dependencies found ({', '.join(missing)})")
+    print(f"🛡️ Bootstrapping environment...")
+    
+    try:
+        # Check if we are in a venv
+        is_venv = sys.prefix != sys.base_prefix
+        pip_cmd = [sys.executable, "-m", "pip", "install"]
+        if not is_venv:
+            print("⚠️ Warning: Not running in a virtual environment. Installation might require permissions.")
+        
+        subprocess.check_call(pip_cmd + missing)
+        print(f"🛡️ Bootstrapping complete. Continuing...\n")
+    except Exception as e:
+        print(f"❌ Error: Failed to install dependencies: {e}", file=sys.stderr)
+        print(f"Please install manually: pip install {' '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
 
 # --- Receipt Commands ---
 
@@ -82,9 +115,8 @@ def cmd_verify(args):
         sys.exit(1)
 
 def cmd_query(args):
-    if not duckdb:
-        print("Error: duckdb is required for query. Install with: pip install duckdb", file=sys.stderr)
-        sys.exit(1)
+    ensure_dependencies(["duckdb"])
+    import duckdb
     path = Path(args.path).expanduser()
     json_pattern = str(path / "**" / "*.json")
     try:
@@ -96,9 +128,8 @@ def cmd_query(args):
         sys.exit(1)
 
 def cmd_report(args):
-    if not duckdb:
-        print("Error: duckdb is required for report. Install with: pip install duckdb", file=sys.stderr)
-        sys.exit(1)
+    ensure_dependencies(["duckdb"])
+    import duckdb
     path = Path(args.path).expanduser()
     json_pattern = str(path / "**" / "*.json")
     print(f"--- Truss Audit Weekly Activity Report ---")
@@ -186,6 +217,9 @@ def cmd_exec(args):
     if not command:
         print("Error: No command provided to exec.")
         sys.exit(1)
+
+    # Surgical Dependency Check
+    ensure_dependencies(["fastapi", "uvicorn", "httpx", "yaml:pyyaml", "pydantic"])
 
     proxy_proc = None
     if not is_port_open(port):
