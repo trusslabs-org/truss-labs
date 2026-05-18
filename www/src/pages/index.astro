@@ -67,8 +67,7 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 				Run the primitives locally:
 			</p>
 			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Download and unpack the primitives
-curl -O https://trusslabs.org/demo/truss-primitives-v0.1.7.tar.gz
-tar -xzf truss-primitives-v0.1.7.tar.gz && cd truss-primitives
+curl -sSL https://trusslabs.org/install.sh | bash
 
 # Add a trap for circular reasoning (retries) and run the pipe
 ./truss trap add --on ON_RETRY --action ACTION_HALT
