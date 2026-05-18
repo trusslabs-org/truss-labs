@@ -15,7 +15,7 @@ import socket
 import importlib
 from pathlib import Path
 
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -33,10 +33,19 @@ DEFAULT_PROXY_PORT = 8000
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+def bootstrap_ledger():
+    """Ensures ledger directory structure exists."""
+    subdirs = ["receipts", "tasks", "sessions", "teams", "specs"]
+    for sd in subdirs:
+        (LEDGER_DIR / sd).mkdir(parents=True, exist_ok=True)
+
 def ensure_bootstrap(packages=None):
     """
     Ensures we are running in the private Truss venv and dependencies are installed.
     """
+    # Always ensure directories exist before doing anything
+    bootstrap_ledger()
+    
     packages = packages or []
     
     # 1. Check if we are already running inside our private venv
@@ -83,9 +92,7 @@ def cmd_install(args):
     """
     # 1. Create Ledger Structure
     print(f"🛡️ Bootstrapping Truss Ledger at {LEDGER_DIR}...")
-    subdirs = ["receipts", "tasks", "sessions", "teams", "specs"]
-    for sd in subdirs:
-        (LEDGER_DIR / sd).mkdir(parents=True, exist_ok=True)
+    bootstrap_ledger()
     
     # 2. Install Binary
     bin_dir = Path("~/.local/bin").expanduser()
@@ -389,6 +396,9 @@ def main():
     p_exec.add_argument("command_to_run", nargs=argparse.REMAINDER, help="Command to run")
 
     args = parser.parse_args()
+
+    # Always ensure bootstrap on any command
+    ensure_bootstrap()
 
     if args.command == "install": cmd_install(args)
     elif args.command == "index": cmd_index(args)
