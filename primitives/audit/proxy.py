@@ -197,14 +197,28 @@ def create_app(
         )
 
     # ------------------------------------------------------------------
+    # Middleware chain — single instance per app, shared across surfaces so
+    # the RedactionMiddleware's swap table works across Gemini AND Anthropic
+    # traffic if you happened to route them both at one truss instance.
+    # ------------------------------------------------------------------
+    from .middleware import (
+        MiddlewareChain,
+        ClassifyMiddleware,
+        PolicyMiddleware,
+        RedactionMiddleware,
+        ReceiptMiddleware,
+    )
+    chain = MiddlewareChain([
+        ClassifyMiddleware(classifiers=classifiers),
+        RedactionMiddleware(),
+        PolicyMiddleware(policy_set=policy_set),
+        ReceiptMiddleware(writer=writer),
+    ])
+
+    # ------------------------------------------------------------------
     # Gemini-API-compatible surface (passthrough).
-    # Clients that honor GOOGLE_GEMINI_BASE_URL (incl. @google/genai used by
-    # gemini-cli) call POST /v1beta/models/{model}:generateContent here.
-    # Truss extracts text from systemInstruction + contents[].parts[].text
-    # for classification but forwards the ORIGINAL body upstream so that
-    # multi-turn conversation history, tool blocks, and generation config
-    # survive intact. Inbound x-goog-api-key is forwarded — truss never
-    # holds Gemini creds for this surface.
+    # @google/genai (gemini-cli) honors GOOGLE_GEMINI_BASE_URL. Inbound
+    # x-goog-api-key is forwarded upstream — truss never holds Gemini creds.
     # ------------------------------------------------------------------
 
     @app.post("/v1beta/models/{model_name}:generateContent")
@@ -212,39 +226,19 @@ def create_app(
         if not x_goog_api_key:
             raise HTTPException(status_code=401, detail="missing x-goog-api-key header")
         body = await request.json()
-        return await _gemini_run(
-            model_name=model_name,
-            body=body,
-            api_key=x_goog_api_key,
-            policy_set=policy_set,
-            classifiers=classifiers,
-            writer=writer,
-            wants_stream=False,
-        )
+        return await _run_gemini(chain, model_name, body, x_goog_api_key, wants_stream=False)
 
     @app.post("/v1beta/models/{model_name}:streamGenerateContent")
     async def gemini_stream(model_name: str, request: Request, x_goog_api_key: Optional[str] = Header(default=None)):
         if not x_goog_api_key:
             raise HTTPException(status_code=401, detail="missing x-goog-api-key header")
         body = await request.json()
-        return await _gemini_run(
-            model_name=model_name,
-            body=body,
-            api_key=x_goog_api_key,
-            policy_set=policy_set,
-            classifiers=classifiers,
-            writer=writer,
-            wants_stream=True,
-        )
+        return await _run_gemini(chain, model_name, body, x_goog_api_key, wants_stream=True)
 
     # ------------------------------------------------------------------
     # Anthropic Messages-compatible surface (passthrough).
-    # Clients that honor ANTHROPIC_BASE_URL (incl. the `claude` CLI) call
-    # POST /v1/messages here. Truss extracts prompt text for classification
-    # but forwards the ORIGINAL body upstream to api.anthropic.com so that
-    # multi-turn message history, tool blocks, and system prompts survive
-    # intact. Inbound x-api-key is forwarded — truss never holds Anthropic
-    # creds for this surface.
+    # The `claude` CLI honors ANTHROPIC_BASE_URL. Inbound x-api-key /
+    # Authorization Bearer is forwarded upstream — truss holds no Anthropic creds.
     # ------------------------------------------------------------------
 
     @app.post("/v1/messages")
@@ -258,17 +252,8 @@ def create_app(
         if not x_api_key and not authorization:
             raise HTTPException(status_code=401, detail="missing x-api-key or authorization header")
         body = await request.json()
-        wants_stream = bool(body.get("stream"))
-        return await _anthropic_run(
-            body=body,
-            x_api_key=x_api_key,
-            authorization=authorization,
-            anthropic_version=anthropic_version,
-            anthropic_beta=anthropic_beta,
-            policy_set=policy_set,
-            classifiers=classifiers,
-            writer=writer,
-            wants_stream=wants_stream,
+        return await _run_anthropic(
+            chain, body, x_api_key, authorization, anthropic_version, anthropic_beta,
         )
 
     return app
@@ -446,101 +431,7 @@ def _handle_chat(
 
 
 # ---------------------------------------------------------------------------
-# Gemini-shape adapters
-# ---------------------------------------------------------------------------
-
-
-def _extract_prompt_from_genai_body(body: Dict[str, Any]) -> str:
-    """Flatten a Gemini generateContent body into the string our policy classifies.
-
-    Captures systemInstruction (always — it's the developer-set scaffold) plus
-    text parts from only the LAST role=user content. Prior turns were already
-    audited when they happened; re-classifying them on every subsequent turn
-    poisons the conversation once any PHI appears. The full body still gets
-    forwarded upstream so multi-turn context survives.
-    """
-    chunks: List[str] = []
-    sys_inst = body.get("systemInstruction") or body.get("system_instruction")
-    if isinstance(sys_inst, dict):
-        for part in sys_inst.get("parts", []) or []:
-            t = part.get("text") if isinstance(part, dict) else None
-            if t:
-                chunks.append(t)
-    for content in reversed(body.get("contents", []) or []):
-        if not isinstance(content, dict) or content.get("role") != "user":
-            continue
-        for part in content.get("parts", []) or []:
-            t = part.get("text") if isinstance(part, dict) else None
-            if t:
-                chunks.append(t)
-        break
-    return "\n\n".join(chunks).strip()
-
-
-def _extract_text_from_genai_response(payload: Dict[str, Any]) -> str:
-    """Pull model text from a Gemini GenerateContentResponse."""
-    chunks: List[str] = []
-    for cand in payload.get("candidates", []) or []:
-        if not isinstance(cand, dict):
-            continue
-        content = cand.get("content") or {}
-        for part in content.get("parts", []) or []:
-            if isinstance(part, dict):
-                t = part.get("text")
-                if t:
-                    chunks.append(t)
-    return "\n\n".join(chunks)
-
-
-def _redact_genai_response(payload: Dict[str, Any], new_text: str) -> Dict[str, Any]:
-    """Return a copy of a Gemini response with text parts collapsed to `new_text`.
-
-    Walks candidates[].content.parts[], overwrites the first text part on the
-    first candidate, drops the rest of the text parts. Non-text parts (functionCall,
-    inlineData) are preserved — classifier didn't see them.
-    """
-    out = dict(payload)
-    candidates = list(payload.get("candidates", []) or [])
-    if not candidates:
-        out["candidates"] = [{"content": {"role": "model", "parts": [{"text": new_text}]}, "finishReason": "STOP", "index": 0}]
-        return out
-    first = dict(candidates[0])
-    content = dict(first.get("content", {}))
-    new_parts: List[Dict[str, Any]] = []
-    replaced = False
-    for part in content.get("parts", []) or []:
-        if isinstance(part, dict) and "text" in part:
-            if not replaced:
-                new_parts.append({"text": new_text})
-                replaced = True
-        else:
-            new_parts.append(part)
-    if not replaced:
-        new_parts.insert(0, {"text": new_text})
-    content["parts"] = new_parts
-    first["content"] = content
-    candidates[0] = first
-    out["candidates"] = candidates
-    return out
-
-
-def _genai_block_payload(model: str, message: str) -> Dict[str, Any]:
-    """Construct a synthetic Gemini response carrying a block notice."""
-    return {
-        "candidates": [
-            {
-                "content": {"role": "model", "parts": [{"text": message}]},
-                "finishReason": "OTHER",
-                "index": 0,
-                "safetyRatings": [],
-            }
-        ],
-        "modelVersion": model,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Helpers
+# Helpers (used by legacy /v1/chat — middleware chain handles the rest)
 # ---------------------------------------------------------------------------
 
 
@@ -599,430 +490,126 @@ ANTHROPIC_UPSTREAM = "https://api.anthropic.com/v1/messages"
 GENAI_UPSTREAM_BASE = "https://generativelanguage.googleapis.com"
 
 
-async def _gemini_run(
-    *,
-    model_name: str,
-    body: Dict[str, Any],
-    api_key: str,
-    policy_set: PolicySet,
-    classifiers: List["Classifier"],
-    writer: ReceiptWriter,
-    wants_stream: bool,
-):
-    """Passthrough for Gemini generateContent.
-
-    Forwards the original body to generativelanguage.googleapis.com so multi-turn
-    `contents[]` history survives. Streaming requests get a batched single-chunk
-    SSE response — policy needs the full upstream response before emitting.
-    """
+async def _run_gemini(chain, model_name: str, body: Dict[str, Any], api_key: str, *, wants_stream: bool):
+    """Thin runner — builds a RouteContext, hands the chain a surface-specific
+    forward callable, and lets the middleware chain do everything else."""
     import httpx  # lazy
+    from .middleware import RouteContext
+    from .surfaces import GeminiSurface
 
-    prompt_text = _extract_prompt_from_genai_body(body)
-
-    actor = {"user_id": os.environ.get("TRUSS_DEFAULT_USER", "gemini-cli"), "user_role": "developer"}
-    tool = {"tool_id": "gemini-cli", "model_id": model_name}
-
-    # ---- Prompt phase --------------------------------------------------
-    prompt_hits = _classify_all(prompt_text, "prompt", classifiers)
-    prompt_eval = evaluate(
-        text=prompt_text,
-        direction="prompt",
-        destination="external_vendor",
-        class_hits=prompt_hits,
-        policy_set=policy_set,
+    ctx = RouteContext(
+        surface=GeminiSurface(),
+        model=model_name,
+        actor={"user_id": os.environ.get("TRUSS_DEFAULT_USER", "gemini-cli"), "user_role": "developer"},
+        tool={"tool_id": "gemini-cli", "model_id": model_name},
+        wants_stream=wants_stream,
     )
 
-    if prompt_eval.final_verdict == "blocked":
-        receipt_path, _ = _write_receipt(
-            writer=writer,
-            actor=actor,
-            tool=tool,
-            prompt_text=prompt_text,
-            response_text="",
-            prompt_hits=prompt_hits,
-            response_hits=[],
-            policy_evaluations=[prompt_eval],
-            llm_meta=None,
-            retention_policy="default_seven_year",
-            retention_years=7,
-            retention_days=None,
-        )
-        block_payload = _genai_block_payload(model_name, prompt_eval.block_user_message or "[blocked by truss policy]")
-        block_payload["trussReceipt"] = str(receipt_path)
-        if wants_stream:
-            return StreamingResponse(
-                iter([f"data: {json.dumps(block_payload)}\n\n"]),
-                media_type="text/event-stream",
-            )
-        return JSONResponse(block_payload)
-
-    # ---- Upstream passthrough -----------------------------------------
-    # Always call :generateContent upstream (non-streaming) so we can run policy
-    # on the full response. We synthesize SSE on the way back if requested.
-    upstream_url = f"{GENAI_UPSTREAM_BASE}/v1beta/models/{model_name}:generateContent"
-    upstream_headers = {
-        "content-type": "application/json",
-        "x-goog-api-key": api_key,
-    }
-
-    t0 = time.perf_counter()
-    try:
+    async def _forward(body, ctx):
+        url = f"{GENAI_UPSTREAM_BASE}/v1beta/models/{ctx.model}:generateContent"
+        headers = {"content-type": "application/json", "x-goog-api-key": api_key}
+        t0 = time.perf_counter()
         async with httpx.AsyncClient(timeout=300.0) as client:
-            up = await client.post(upstream_url, json=body, headers=upstream_headers)
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Gemini upstream failed: {e}") from e
-    latency_ms = int((time.perf_counter() - t0) * 1000)
+            up = await client.post(url, json=body, headers=headers)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        if up.status_code >= 400:
+            return JSONResponse(
+                status_code=up.status_code,
+                content={"truss": "upstream_error", "upstream_status": up.status_code, "body": up.text},
+            ), latency_ms
+        return up.json(), latency_ms
 
-    if up.status_code >= 400:
-        return JSONResponse(
-            status_code=up.status_code,
-            content={"truss": "upstream_error", "upstream_status": up.status_code, "body": up.text},
-        )
-
-    upstream_payload = up.json()
-    response_text = _extract_text_from_genai_response(upstream_payload)
-
-    # ---- Response phase -----------------------------------------------
-    response_hits = _classify_all(response_text, "response", classifiers)
-    response_eval = evaluate(
-        text=response_text,
-        direction="response",
-        destination="external_vendor",
-        class_hits=response_hits,
-        policy_set=policy_set,
-    )
-
-    usage = upstream_payload.get("usageMetadata") or {}
-    tokens_used = usage.get("totalTokenCount")
-    llm_meta = {"tokens_used": tokens_used, "latency_ms": latency_ms}
-
-    if response_eval.final_verdict == "blocked":
-        receipt_path, _ = _write_receipt(
-            writer=writer,
-            actor=actor,
-            tool=tool,
-            prompt_text=prompt_text,
-            response_text=response_text,
-            prompt_hits=prompt_hits,
-            response_hits=response_hits,
-            policy_evaluations=[prompt_eval, response_eval],
-            llm_meta=llm_meta,
-            retention_policy="default_seven_year",
-            retention_years=7,
-            retention_days=None,
-        )
-        block_payload = _genai_block_payload(model_name, response_eval.block_user_message or "[blocked by truss policy]")
-        block_payload["trussReceipt"] = str(receipt_path)
-        if wants_stream:
-            return StreamingResponse(
-                iter([f"data: {json.dumps(block_payload)}\n\n"]),
-                media_type="text/event-stream",
-            )
-        return JSONResponse(block_payload)
-
-    final_text = response_eval.mutated_text or response_text
-    final_payload = upstream_payload
-    if response_eval.final_verdict == "redacted":
-        final_payload = _redact_genai_response(upstream_payload, final_text)
-
-    receipt_path, _ = _write_receipt(
-        writer=writer,
-        actor=actor,
-        tool=tool,
-        prompt_text=prompt_text,
-        response_text=final_text,
-        prompt_hits=prompt_hits,
-        response_hits=response_hits,
-        policy_evaluations=[prompt_eval, response_eval],
-        llm_meta=llm_meta,
-        retention_policy="default_seven_year",
-        retention_years=7,
-        retention_days=None,
-    )
-    final_payload = dict(final_payload)
-    final_payload["trussReceipt"] = str(receipt_path)
-
-    if wants_stream:
+    def _emit(payload):
         return StreamingResponse(
-            iter([f"data: {json.dumps(final_payload)}\n\n"]),
+            iter([f"data: {json.dumps(payload)}\n\n"]),
             media_type="text/event-stream",
         )
-    return JSONResponse(final_payload)
+
+    return await chain.run(body, ctx, _forward, _emit)
 
 
-def _extract_prompt_from_anthropic_body(body: Dict[str, Any]) -> str:
-    """Flatten an Anthropic Messages body into text for policy classification.
-
-    Captures the `system` field (always — developer-set scaffold) plus text
-    blocks from only the LAST role=user message. Prior turns were already
-    audited when they happened; re-classifying them on every subsequent turn
-    poisons the conversation once any PHI appears. The full body still gets
-    forwarded upstream so multi-turn context survives.
-    """
-    chunks: List[str] = []
-    system = body.get("system")
-    if isinstance(system, str):
-        chunks.append(system)
-    elif isinstance(system, list):
-        for block in system:
-            if isinstance(block, dict) and block.get("type") == "text":
-                t = block.get("text")
-                if t:
-                    chunks.append(t)
-    for msg in reversed(body.get("messages", []) or []):
-        if not isinstance(msg, dict) or msg.get("role") != "user":
-            continue
-        content = msg.get("content")
-        if isinstance(content, str):
-            chunks.append(content)
-        elif isinstance(content, list):
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    t = block.get("text")
-                    if t:
-                        chunks.append(t)
-        break
-    return "\n\n".join(chunks).strip()
-
-
-def _extract_text_from_anthropic_response(payload: Dict[str, Any]) -> str:
-    """Pull assistant text out of an Anthropic Messages response."""
-    chunks: List[str] = []
+def _anthropic_sse_for_payload(payload: Dict[str, Any]):
+    """Anthropic SSE event sequence for one batched payload. Lives here
+    (not in surfaces.py) because it's an iterator generator the route emitter
+    captures by reference; surfaces.py is pure data shaping."""
+    text = ""
     for block in payload.get("content", []) or []:
         if isinstance(block, dict) and block.get("type") == "text":
-            t = block.get("text")
-            if t:
-                chunks.append(t)
-    return "\n\n".join(chunks)
-
-
-def _redact_anthropic_response(payload: Dict[str, Any], new_text: str) -> Dict[str, Any]:
-    """Return a copy of an Anthropic response with text-block content replaced.
-
-    Walks `content[]` and overwrites the first text block; drops the rest of
-    the text blocks. Non-text blocks (tool_use) are left in place because the
-    classifier didn't see them and we don't have a safe redaction story yet.
-    """
-    out = dict(payload)
-    new_content: List[Dict[str, Any]] = []
-    replaced = False
-    for block in payload.get("content", []) or []:
-        if isinstance(block, dict) and block.get("type") == "text":
-            if not replaced:
-                new_content.append({"type": "text", "text": new_text})
-                replaced = True
-            # subsequent text blocks dropped — collapsed into the first
-        else:
-            new_content.append(block)
-    if not replaced:
-        new_content.insert(0, {"type": "text", "text": new_text})
-    out["content"] = new_content
-    return out
-
-
-def _anthropic_block_payload(model: str, message: str) -> Dict[str, Any]:
-    """Construct a synthetic Anthropic Messages response carrying a block notice."""
-    return {
-        "id": f"msg_truss_block_{int(time.time() * 1000)}",
-        "type": "message",
-        "role": "assistant",
-        "model": model,
-        "content": [{"type": "text", "text": message}],
-        "stop_reason": "end_turn",
-        "stop_sequence": None,
-        "usage": {"input_tokens": 0, "output_tokens": 0},
-    }
-
-
-def _anthropic_sse(payload: Dict[str, Any]):
-    """Emit an Anthropic SSE event sequence carrying a complete response.
-
-    Single batched flush — policy needs the full upstream response before we
-    can emit anything, so we don't stream incrementally.
-    """
-    text = _extract_text_from_anthropic_response(payload) or ""
+            text += block.get("text") or ""
     msg_meta = {
-        "id": payload.get("id"),
-        "type": "message",
-        "role": "assistant",
-        "model": payload.get("model"),
-        "content": [],
-        "stop_reason": None,
-        "stop_sequence": None,
+        "id": payload.get("id"), "type": "message", "role": "assistant",
+        "model": payload.get("model"), "content": [],
+        "stop_reason": None, "stop_sequence": None,
         "usage": payload.get("usage", {"input_tokens": 0, "output_tokens": 0}),
     }
-    events: List[Tuple[str, Dict[str, Any]]] = [
+    events = [
         ("message_start", {"type": "message_start", "message": msg_meta}),
-        ("content_block_start", {
-            "type": "content_block_start",
-            "index": 0,
-            "content_block": {"type": "text", "text": ""},
-        }),
-        ("content_block_delta", {
-            "type": "content_block_delta",
-            "index": 0,
-            "delta": {"type": "text_delta", "text": text},
-        }),
+        ("content_block_start", {"type": "content_block_start", "index": 0,
+                                  "content_block": {"type": "text", "text": ""}}),
+        ("content_block_delta", {"type": "content_block_delta", "index": 0,
+                                  "delta": {"type": "text_delta", "text": text}}),
         ("content_block_stop", {"type": "content_block_stop", "index": 0}),
-        ("message_delta", {
-            "type": "message_delta",
-            "delta": {
-                "stop_reason": payload.get("stop_reason", "end_turn"),
-                "stop_sequence": payload.get("stop_sequence"),
-            },
-            "usage": {"output_tokens": payload.get("usage", {}).get("output_tokens", 0)},
-        }),
+        ("message_delta", {"type": "message_delta",
+                            "delta": {"stop_reason": payload.get("stop_reason", "end_turn"),
+                                      "stop_sequence": payload.get("stop_sequence")},
+                            "usage": {"output_tokens": payload.get("usage", {}).get("output_tokens", 0)}}),
         ("message_stop", {"type": "message_stop"}),
     ]
     for name, data in events:
         yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _anthropic_run(
-    *,
+async def _run_anthropic(
+    chain,
     body: Dict[str, Any],
     x_api_key: Optional[str],
     authorization: Optional[str],
     anthropic_version: Optional[str],
     anthropic_beta: Optional[str],
-    policy_set: PolicySet,
-    classifiers: List["Classifier"],
-    writer: ReceiptWriter,
-    wants_stream: bool,
 ):
-    import httpx  # lazy — only this path needs it
+    """Thin runner — builds context, hands chain a forwarder + SSE emitter."""
+    import httpx
+    from .middleware import RouteContext
+    from .surfaces import AnthropicSurface
 
     model_name = body.get("model") or "claude-unknown"
-    prompt_text = _extract_prompt_from_anthropic_body(body)
+    wants_stream = bool(body.get("stream"))
 
-    actor = {"user_id": os.environ.get("TRUSS_DEFAULT_USER", "claude-cli"), "user_role": "developer"}
-    tool = {"tool_id": "claude-cli", "model_id": model_name}
-
-    # ---- Prompt phase --------------------------------------------------
-    prompt_hits = _classify_all(prompt_text, "prompt", classifiers)
-    prompt_eval = evaluate(
-        text=prompt_text,
-        direction="prompt",
-        destination="external_vendor",
-        class_hits=prompt_hits,
-        policy_set=policy_set,
+    ctx = RouteContext(
+        surface=AnthropicSurface(),
+        model=model_name,
+        actor={"user_id": os.environ.get("TRUSS_DEFAULT_USER", "claude-cli"), "user_role": "developer"},
+        tool={"tool_id": "claude-cli", "model_id": model_name},
+        wants_stream=wants_stream,
     )
 
-    if prompt_eval.final_verdict == "blocked":
-        receipt_path, _ = _write_receipt(
-            writer=writer,
-            actor=actor,
-            tool=tool,
-            prompt_text=prompt_text,
-            response_text="",
-            prompt_hits=prompt_hits,
-            response_hits=[],
-            policy_evaluations=[prompt_eval],
-            llm_meta=None,
-            retention_policy="default_seven_year",
-            retention_years=7,
-            retention_days=None,
-        )
-        block_payload = _anthropic_block_payload(model_name, prompt_eval.block_user_message or "[blocked by truss policy]")
-        block_payload["trussReceipt"] = str(receipt_path)
-        if wants_stream:
-            return StreamingResponse(_anthropic_sse(block_payload), media_type="text/event-stream")
-        return JSONResponse(block_payload)
-
-    # ---- Upstream passthrough -----------------------------------------
-    # Force stream=false upstream — we batch-emit SSE ourselves once policy clears.
-    upstream_body = dict(body)
-    upstream_body.pop("stream", None)
-
-    upstream_headers = {
-        "content-type": "application/json",
-        "anthropic-version": anthropic_version or "2023-06-01",
-    }
-    if x_api_key:
-        upstream_headers["x-api-key"] = x_api_key
-    if authorization:
-        upstream_headers["authorization"] = authorization
-    if anthropic_beta:
-        upstream_headers["anthropic-beta"] = anthropic_beta
-
-    t0 = time.perf_counter()
-    try:
+    async def _forward(body, ctx):
+        # Always force stream=false upstream — we batch-emit SSE ourselves
+        # once policy has had a chance to inspect the full response.
+        upstream_body = dict(body)
+        upstream_body.pop("stream", None)
+        headers = {
+            "content-type": "application/json",
+            "anthropic-version": anthropic_version or "2023-06-01",
+        }
+        if x_api_key: headers["x-api-key"] = x_api_key
+        if authorization: headers["authorization"] = authorization
+        if anthropic_beta: headers["anthropic-beta"] = anthropic_beta
+        t0 = time.perf_counter()
         async with httpx.AsyncClient(timeout=300.0) as client:
-            up = await client.post(ANTHROPIC_UPSTREAM, json=upstream_body, headers=upstream_headers)
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Anthropic upstream failed: {e}") from e
-    latency_ms = int((time.perf_counter() - t0) * 1000)
+            up = await client.post(ANTHROPIC_UPSTREAM, json=upstream_body, headers=headers)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        if up.status_code >= 400:
+            return JSONResponse(
+                status_code=up.status_code,
+                content={"truss": "upstream_error", "upstream_status": up.status_code, "body": up.text},
+            ), latency_ms
+        return up.json(), latency_ms
 
-    # Pass through upstream errors so the CLI sees the real status / message.
-    if up.status_code >= 400:
-        return JSONResponse(
-            status_code=up.status_code,
-            content={"truss": "upstream_error", "upstream_status": up.status_code, "body": up.text},
-        )
+    def _emit(payload):
+        return StreamingResponse(_anthropic_sse_for_payload(payload), media_type="text/event-stream")
 
-    upstream_payload = up.json()
-    response_text = _extract_text_from_anthropic_response(upstream_payload)
-
-    # ---- Response phase -----------------------------------------------
-    response_hits = _classify_all(response_text, "response", classifiers)
-    response_eval = evaluate(
-        text=response_text,
-        direction="response",
-        destination="external_vendor",
-        class_hits=response_hits,
-        policy_set=policy_set,
-    )
-
-    usage = upstream_payload.get("usage") or {}
-    tokens_used = (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0) or None
-    llm_meta = {"tokens_used": tokens_used, "latency_ms": latency_ms}
-
-    if response_eval.final_verdict == "blocked":
-        receipt_path, _ = _write_receipt(
-            writer=writer,
-            actor=actor,
-            tool=tool,
-            prompt_text=prompt_text,
-            response_text=response_text,
-            prompt_hits=prompt_hits,
-            response_hits=response_hits,
-            policy_evaluations=[prompt_eval, response_eval],
-            llm_meta=llm_meta,
-            retention_policy="default_seven_year",
-            retention_years=7,
-            retention_days=None,
-        )
-        block_payload = _anthropic_block_payload(model_name, response_eval.block_user_message or "[blocked by truss policy]")
-        block_payload["trussReceipt"] = str(receipt_path)
-        if wants_stream:
-            return StreamingResponse(_anthropic_sse(block_payload), media_type="text/event-stream")
-        return JSONResponse(block_payload)
-
-    final_text = response_eval.mutated_text or response_text
-    final_payload = upstream_payload
-    if response_eval.final_verdict == "redacted":
-        final_payload = _redact_anthropic_response(upstream_payload, final_text)
-
-    receipt_path, _ = _write_receipt(
-        writer=writer,
-        actor=actor,
-        tool=tool,
-        prompt_text=prompt_text,
-        response_text=final_text,
-        prompt_hits=prompt_hits,
-        response_hits=response_hits,
-        policy_evaluations=[prompt_eval, response_eval],
-        llm_meta=llm_meta,
-        retention_policy="default_seven_year",
-        retention_years=7,
-        retention_days=None,
-    )
-    final_payload = dict(final_payload)
-    final_payload["trussReceipt"] = str(receipt_path)
-
-    if wants_stream:
-        return StreamingResponse(_anthropic_sse(final_payload), media_type="text/event-stream")
-    return JSONResponse(final_payload)
+    return await chain.run(body, ctx, _forward, _emit)
 
 
 __all__ = [
