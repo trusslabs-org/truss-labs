@@ -36,3 +36,7 @@ venv/
 
 # Claude Code project state
 .claude/
+
+# Tarball build staging — rebuilt by build-tarball.sh on every release.
+# The published artifact is www/public/demo/truss-primitives-v*.tar.gz.
+tmp/
