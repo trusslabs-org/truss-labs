@@ -7,13 +7,13 @@ and the demo uses it to make audit-only-mode tangible to a CISO.
 
 Usage:
     python -m primitives.audit.policy_eval \\
-        --policies ~/.truss/policies/ \\
+        --policies ~/.truss/ledger/policies/ \\
         --taxonomy primitives/audit/taxonomies/phi.yaml \\
         --prompt "Patient John D., DOB 1978-04-12, A1C 8.2..." \\
         --destination external_vendor
 
     python -m primitives.audit.policy_eval \\
-        --policies ~/.truss/policies/ \\
+        --policies ~/.truss/ledger/policies/ \\
         --taxonomy primitives/audit/taxonomies/phi.yaml \\
         --taxonomy primitives/audit/taxonomies/generic.yaml \\
         --prompt-file ./samples/case_note.txt \\
@@ -57,7 +57,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--policies",
         type=Path,
         required=True,
-        help="Directory of *.yaml policy files (e.g. ~/.truss/policies/).",
+        help="Directory of *.yaml policy files (e.g. ~/.truss/ledger/policies/).",
     )
     p.add_argument(
         "--taxonomy",

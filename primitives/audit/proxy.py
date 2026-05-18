@@ -12,8 +12,8 @@ For each request the proxy:
   6. Writes a v1.1 receipt carrying both phases' decisions and returns the (possibly redacted) response.
 
 Configuration via env vars (read in `create_app_from_env`):
-  TRUSS_POLICIES_DIR    default ~/.truss/policies/
-  TRUSS_RECEIPTS_DIR    default ~/.truss/receipts/
+  TRUSS_POLICIES_DIR    default ~/.truss/ledger/policies/
+  TRUSS_RECEIPTS_DIR    default ~/.truss/ledger/receipts/
   TRUSS_TAXONOMIES      colon-separated taxonomy YAML paths (required)
   GEMINI_API_KEY        if set, default LLMClient is GeminiClient; else StubLLMClient
   GEMINI_MODEL_ID       default "gemini-3-flash-preview"
@@ -202,10 +202,10 @@ def create_app(
 def create_app_from_env() -> FastAPI:
     """Production entry point. Reads TRUSS_* + GEMINI_* env vars."""
     policies_dir = Path(
-        os.environ.get("TRUSS_POLICIES_DIR", "~/.truss/policies")
+        os.environ.get("TRUSS_POLICIES_DIR", "~/.truss/ledger/policies")
     ).expanduser()
     receipts_dir = Path(
-        os.environ.get("TRUSS_RECEIPTS_DIR", "~/.truss/receipts")
+        os.environ.get("TRUSS_RECEIPTS_DIR", "~/.truss/ledger/receipts")
     ).expanduser()
 
     raw_taxonomies = os.environ.get("TRUSS_TAXONOMIES", "")

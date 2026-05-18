@@ -3,7 +3,7 @@
 Per docs/research/RECEIPT_SCHEMA.md and primitives/audit/schema.py.
 
 Usage:
-    writer = ReceiptWriter(receipts_dir=Path("~/.truss/receipts").expanduser())
+    writer = ReceiptWriter(receipts_dir=Path("~/.truss/ledger/receipts").expanduser())
     receipt_path = writer.write(
         actor={"user_id": "alice@example.com", "user_role": "clinician"},
         tool={"tool_id": "epic_chat_assistant", "model_id": "gpt-4o-2024-11-20"},

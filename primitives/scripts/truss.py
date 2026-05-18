@@ -23,7 +23,7 @@ try:
 except ImportError:
     duckdb = None
 
-DEFAULT_RECEIPTS_DIR = Path("~/.truss/receipts").expanduser()
+DEFAULT_RECEIPTS_DIR = Path("~/.truss/ledger/receipts").expanduser()
 
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()

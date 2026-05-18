@@ -23,7 +23,7 @@ if [[ -f "${HOME}/.gemini/.env" ]]; then
 fi
 
 export TRUSS_POLICIES_DIR="${REPO_ROOT}/examples/policies"
-export TRUSS_RECEIPTS_DIR="${TRUSS_RECEIPTS_DIR:-${HOME}/.truss/receipts}"
+export TRUSS_RECEIPTS_DIR="${TRUSS_RECEIPTS_DIR:-${HOME}/.truss/ledger/receipts}"
 export TRUSS_TAXONOMIES="${REPO_ROOT}/primitives/audit/taxonomies/phi.yaml"
 
 cd "${REPO_ROOT}"

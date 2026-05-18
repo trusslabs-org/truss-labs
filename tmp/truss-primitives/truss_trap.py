@@ -17,7 +17,7 @@ def _project() -> str:
 
 
 def _traps_path() -> str:
-    return os.path.expanduser(f"~/truss/specs/{_project()}/traps.json")
+    return os.path.expanduser(f"~/.truss/ledger/specs/{_project()}/traps.json")
 
 
 def load_traps():

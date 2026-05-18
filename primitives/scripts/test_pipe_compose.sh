@@ -5,7 +5,7 @@
 #
 # This test exercises the pipe mechanically against a fixture shaped like a
 # post-ingest TWP trace (node_id / type / audit_flags). The current
-# ~/truss/traces/ directory holds hooks-event JSONL, which has a
+# ~/.truss/ledger/traces/ directory holds hooks-event JSONL, which has a
 # different shape — a translator from hooks.jsonl → TWP node shape is a
 # separate concern (soul_ingest is currently LangChain-only).
 

@@ -5,7 +5,7 @@
 #   "State belongs on disk, not in a vendor's database."
 #
 # One-liner:
-#   Your agent's memory is at ~/truss/. Back it up with cp -r.
+#   Your agent's memory is at ~/.truss/ledger/. Back it up with cp -r.
 #   Walk away from any vendor tomorrow.
 #
 # Clarity test:
@@ -37,7 +37,7 @@
 # PRIVACY NOTE
 # ------------------------------------------------------------------------
 #
-# This script is scoped to truss-labs/ on purpose. The ~/truss/tasks/
+# This script is scoped to truss-labs/ on purpose. The ~/.truss/ledger/tasks/
 # directory at the top level contains other project names (client work,
 # personal projects) that may be private. Do NOT run `ls tasks/` unscoped
 # during recording without reviewing what's there first.

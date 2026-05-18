@@ -5,7 +5,7 @@ v0.2. This file mirrors that doc as code; when the doc changes, update both.
 
 Usage:
     from primitives.audit.policy_schema import Policy
-    raw = yaml.safe_load(open("~/.truss/policies/foo.yaml"))
+    raw = yaml.safe_load(open("~/.truss/ledger/policies/foo.yaml"))
     policy = Policy.model_validate(raw)   # raises pydantic.ValidationError on bad YAML
 
 Design invariants:

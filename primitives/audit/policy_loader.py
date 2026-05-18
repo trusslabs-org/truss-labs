@@ -1,4 +1,4 @@
-"""Policy loader — cold-boot scan of ~/.truss/policies/*.yaml.
+"""Policy loader — cold-boot scan of ~/.truss/ledger/policies/*.yaml.
 
 Per docs/research/POLICY_ENGINE_SPEC.md v0.2:
   - Loads every *.yaml file in the policy directory (single-level glob).
