@@ -15,7 +15,7 @@ import socket
 import importlib
 from pathlib import Path
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -320,6 +320,25 @@ def cmd_exec(args):
             print("🛡️ Truss Audit Proxy stopped.")
 
 def main():
+    # If no arguments, print header and help
+    if len(sys.argv) == 1:
+        print(f"🛡️ Truss Audit Substrate (v{VERSION})")
+        print("--------------------------------")
+        parser = argparse.ArgumentParser(prog="truss")
+        parser.add_argument("--version", action="version", version=f"truss {VERSION}")
+        subparsers = parser.add_subparsers(dest="command", required=True)
+        subparsers.add_parser("install", help="Install truss CLI and bootstrap ledger")
+        subparsers.add_parser("exec", help="Run a command under Truss governance")
+        subparsers.add_parser("index", help="Index receipts")
+        subparsers.add_parser("verify", help="Verify receipt hashes")
+        subparsers.add_parser("query", help="Query receipts using SQL")
+        subparsers.add_parser("report", help="Generate audit report")
+        subparsers.add_parser("translate", help="Translate logs to TWP nodes")
+        subparsers.add_parser("analyze", help="Analyze trace nodes")
+        subparsers.add_parser("trap", help="Manage audit traps")
+        parser.print_help()
+        return
+
     # If first arg is 'exec', bootstrap and re-exec
     if len(sys.argv) > 1 and sys.argv[1] == "exec":
         ensure_bootstrap()
