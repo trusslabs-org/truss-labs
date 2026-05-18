@@ -16,7 +16,7 @@ import importlib
 import shutil
 from pathlib import Path
 
-VERSION = "0.1.9"
+VERSION = "0.2.0"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -312,15 +312,24 @@ def cmd_exec(args):
     
     # Resolve the executable path manually to ensure it's found
     executable = shutil.which(command[0], path=new_path)
-    if executable:
-        command[0] = executable
-
+    
     print(f"🛡️ Truss Governance Active (Policy: {policy or 'default'})")
-    print(f"🛡️ Executing: {' '.join(command)}")
     
     # 3. Run the command
     try:
-        result = subprocess.run(command, env=env)
+        if executable:
+            # Command found as a file - run normally
+            command[0] = executable
+            print(f"🛡️ Executing binary: {' '.join(command)}")
+            result = subprocess.run(command, env=env)
+        else:
+            # Command not found as file - likely a shell function. 
+            # We wrap it in zsh -i -c to allow it to be found.
+            shell_cmd = " ".join(command)
+            print(f"🛡️ Executing shell command: {shell_cmd}")
+            # Use zsh -i to load aliases/functions from .zshrc
+            result = subprocess.run(["zsh", "-i", "-c", shell_cmd], env=env)
+            
         sys.exit(result.returncode)
     except KeyboardInterrupt:
         pass
