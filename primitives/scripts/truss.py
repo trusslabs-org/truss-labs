@@ -206,21 +206,27 @@ def cmd_exec(args):
     port = DEFAULT_PROXY_PORT
     command = []
 
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        if arg == "--policy" and i + 1 < len(args):
-            policy = args[i+1]
-            i += 2
-        elif arg == "--port" and i + 1 < len(args):
-            port = int(args[i+1])
-            i += 2
-        elif arg == "--":
-            command = args[i+1:]
-            break
-        else:
-            command = args[i:]
-            break
+    # If args is a Namespace (from argparse), handle it, else it's a list from manual main()
+    if hasattr(args, 'command_to_run'):
+        policy = args.policy
+        port = args.port or DEFAULT_PROXY_PORT
+        command = args.command_to_run
+    else:
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg == "--policy" and i + 1 < len(args):
+                policy = args[i+1]
+                i += 2
+            elif arg == "--port" and i + 1 < len(args):
+                port = int(args[i+1])
+                i += 2
+            elif arg == "--":
+                command = args[i+1:]
+                break
+            else:
+                command = args[i:]
+                break
     
     if not command:
         print("Error: No command provided to exec.")
@@ -289,41 +295,45 @@ def main():
         cmd_exec(sys.argv[2:])
         return
 
-    # For other commands, we might not need the venv yet, 
-    # but let's make it consistent.
     parser = argparse.ArgumentParser(prog="truss")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_index = subparsers.add_parser("index")
+    p_index = subparsers.add_parser("index", help="Index receipts")
     p_index.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
 
-    p_verify = subparsers.add_parser("verify")
+    p_verify = subparsers.add_parser("verify", help="Verify receipt hashes")
     p_verify.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
     p_verify.add_argument("--allow-empty", action="store_true")
 
-    p_query = subparsers.add_parser("query")
+    p_query = subparsers.add_parser("query", help="Query receipts using SQL (DuckDB)")
     p_query.add_argument("sql")
     p_query.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_report = subparsers.add_parser("report")
+    p_report = subparsers.add_parser("report", help="Generate audit report")
     p_report.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_translate = subparsers.add_parser("translate")
+    p_translate = subparsers.add_parser("translate", help="Translate hooks.jsonl to TWP nodes")
     p_translate.add_argument("input", nargs="?", default="-")
     p_translate.add_argument("output", nargs="?", default="-")
 
-    p_analyze = subparsers.add_parser("analyze")
+    p_analyze = subparsers.add_parser("analyze", help="Analyze trace nodes for flags")
     p_analyze.add_argument("trace", nargs="?", default="-")
     p_analyze.add_argument("--type")
     p_analyze.add_argument("--flag")
     p_analyze.add_argument("--id")
     p_analyze.add_argument("--json", action="store_true")
 
-    p_trap = subparsers.add_parser("trap")
+    p_trap = subparsers.add_parser("trap", help="Manage and run audit traps")
     p_trap.add_argument("trap_command", choices=["add", "clear", "list", "run"])
     p_trap.add_argument("--on")
     p_trap.add_argument("--action")
     p_trap.add_argument("--project")
+
+    # This parser is mostly for help documentation, as main() handles 'exec' manually above
+    p_exec = subparsers.add_parser("exec", help="Run a command under Truss governance")
+    p_exec.add_argument("--policy", help="Path to policy YAML file")
+    p_exec.add_argument("--port", type=int, help="Proxy port (default 8000)")
+    p_exec.add_argument("command_to_run", nargs=argparse.REMAINDER, help="Command to run")
 
     args = parser.parse_args()
 
@@ -334,6 +344,10 @@ def main():
     elif args.command == "translate": cmd_translate(args)
     elif args.command == "analyze": cmd_analyze(args)
     elif args.command == "trap": cmd_trap(args)
+    elif args.command == "exec":
+        # This branch is reached if somebody runs 'python3 truss.py exec' 
+        # when ALREADY in the venv.
+        cmd_exec(args)
 
 if __name__ == "__main__":
     # Ensure local primitives are importable
