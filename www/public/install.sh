@@ -8,7 +8,7 @@ TRUSS_HOME="$HOME/.truss"
 BIN_DIR="$TRUSS_HOME/bin"
 PRIMITIVES_DIR="$TRUSS_HOME/primitives"
 VERSION="0.2.3"
-TARBALL_URL="https://trusslabs.org/demo/truss-primitives-v$VERSION.tar.gz"
+TARBALL_URL="https://trusslabs.org/demo/truss-primitives.tar.gz"
 
 # 1. Create directory structure
 mkdir -p "$BIN_DIR"
