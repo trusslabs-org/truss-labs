@@ -15,7 +15,7 @@ import socket
 import importlib
 from pathlib import Path
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -322,8 +322,8 @@ def cmd_exec(args):
 
 def main():
     # MANDATORY: Bootstrap directories before anything else
-    # We don't call ensure_bootstrap() because it triggers re-exec/venv setup
-    # which we only want on actual commands. We just want the folders.
+    if not LEDGER_DIR.exists():
+        print(f"🛡️ Initializing Truss Ledger at {LEDGER_DIR}...")
     bootstrap_ledger()
 
     # If no arguments, print header and help

@@ -3,7 +3,9 @@ set -e
 REPO_ROOT=$(pwd)
 BUILD_DIR="tmp/truss-primitives"
 TARGET_DIR="www/public/demo"
-TARBALL="truss-primitives.tar.gz"
+VERSION="0.1.7"
+TARBALL="truss-primitives-v$VERSION.tar.gz"
+
 echo "Building $TARBALL..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -39,5 +41,8 @@ License: Apache 2.0
 " > "$BUILD_DIR/README.md"
 mkdir -p "$TARGET_DIR"
 tar -czf "$TARGET_DIR/$TARBALL" -C tmp truss-primitives
+# Also keep the generic name for now, but the homepage will point to versioned
+cp "$TARGET_DIR/$TARBALL" "$TARGET_DIR/truss-primitives.tar.gz"
+
 echo "Success: $TARGET_DIR/$TARBALL created."
 ls -lh "$TARGET_DIR/$TARBALL"
