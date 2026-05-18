@@ -10,6 +10,8 @@ import signal
 import sys
 import os
 import subprocess
+import time
+import socket
 from pathlib import Path
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
@@ -24,6 +26,7 @@ except ImportError:
     duckdb = None
 
 DEFAULT_RECEIPTS_DIR = Path("~/.truss/ledger/receipts").expanduser()
+DEFAULT_PROXY_PORT = 8000
 
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -150,55 +153,134 @@ def cmd_trap(args):
 
 # --- The Demo Wrapper ---
 
+def is_port_open(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
 def cmd_exec(args):
-    print(f"Truss: Executing governance wrapper for '{' '.join(args.command)}'...")
-    env = os.environ.copy()
-    try:
-        result = subprocess.run(args.command, env=env)
-        sys.exit(result.returncode)
-    except KeyboardInterrupt:
-        sys.exit(130)
-    except Exception as e:
-        print(f"Truss Error: {e}", file=sys.stderr)
+    """
+    truss exec [options] -- command args...
+    """
+    # 1. Parse manual options since argparse.REMAINDER is finicky
+    policy = None
+    port = DEFAULT_PROXY_PORT
+    command = []
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--policy" and i + 1 < len(args):
+            policy = args[i+1]
+            i += 2
+        elif arg == "--port" and i + 1 < len(args):
+            port = int(args[i+1])
+            i += 2
+        elif arg == "--":
+            command = args[i+1:]
+            break
+        else:
+            # First non-option is the start of the command if no --
+            command = args[i:]
+            break
+    
+    if not command:
+        print("Error: No command provided to exec.")
         sys.exit(1)
 
+    proxy_proc = None
+    if not is_port_open(port):
+        print(f"🛡️ Starting Truss Audit Proxy on port {port}...")
+        proxy_env = os.environ.copy()
+        if policy:
+            proxy_env["TRUSS_POLICY_PATH"] = str(Path(policy).absolute())
+        
+        # Start uvicorn in the background
+        proxy_proc = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "primitives.audit.proxy:create_app_from_env", "--port", str(port), "--factory"],
+            env=proxy_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        
+        # Wait for proxy to start
+        retries = 30
+        while not is_port_open(port) and retries > 0:
+            time.sleep(0.2)
+            retries -= 1
+        
+        if retries == 0:
+            print("Error: Truss Audit Proxy failed to start.", file=sys.stderr)
+            if proxy_proc: proxy_proc.terminate()
+            sys.exit(1)
+        print("🛡️ Truss Audit Proxy ready.")
+    else:
+        print(f"🛡️ Using existing Truss Audit Proxy on port {port}.")
+
+    print(f"🛡️ Truss Governance Active (Policy: {policy or 'default'})")
+    print(f"🛡️ Executing: {' '.join(command)}")
+    
+    # 2. Prepare Environment
+    env = os.environ.copy()
+    proxy_url = f"http://localhost:{port}"
+    env["HTTP_PROXY"] = proxy_url
+    env["HTTPS_PROXY"] = proxy_url
+    env["http_proxy"] = proxy_url
+    env["https_proxy"] = proxy_url
+    
+    # 3. Run the command
+    try:
+        result = subprocess.run(command, env=env)
+        sys.exit(result.returncode)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"Truss Error: {e}", file=sys.stderr)
+    finally:
+        if proxy_proc:
+            print("\n🛡️ Stopping Truss Audit Proxy...")
+            proxy_proc.terminate()
+            proxy_proc.wait()
+            print("🛡️ Truss Audit Proxy stopped.")
+
 def main():
+    # If first arg is 'exec', handle it manually to avoid argparse subparser issues with REMAINDER
+    if len(sys.argv) > 1 and sys.argv[1] == "exec":
+        cmd_exec(sys.argv[2:])
+        return
+
     parser = argparse.ArgumentParser(prog="truss")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_index = subparsers.add_parser("index")
+    p_index = subparsers.add_parser("index", help="Index receipts")
     p_index.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
 
-    p_verify = subparsers.add_parser("verify")
+    p_verify = subparsers.add_parser("verify", help="Verify receipt hashes")
     p_verify.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
     p_verify.add_argument("--allow-empty", action="store_true")
 
-    p_query = subparsers.add_parser("query")
-    p_query.add_argument("sql")
+    p_query = subparsers.add_parser("query", help="Query receipts using SQL (DuckDB)")
+    p_query.add_argument("sql", help="SQL query. Use 'receipts' as the table name.")
     p_query.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_report = subparsers.add_parser("report")
+    p_report = subparsers.add_parser("report", help="Generate audit report")
     p_report.add_argument("--path", type=str, default=str(DEFAULT_RECEIPTS_DIR))
 
-    p_translate = subparsers.add_parser("translate")
+    p_translate = subparsers.add_parser("translate", help="Translate hooks.jsonl to TWP nodes")
     p_translate.add_argument("input", nargs="?", default="-")
     p_translate.add_argument("output", nargs="?", default="-")
 
-    p_analyze = subparsers.add_parser("analyze")
+    p_analyze = subparsers.add_parser("analyze", help="Analyze trace nodes for flags")
     p_analyze.add_argument("trace", nargs="?", default="-")
-    p_analyze.add_argument("--type")
-    p_analyze.add_argument("--flag")
-    p_analyze.add_argument("--id")
-    p_analyze.add_argument("--json", action="store_true")
+    p_analyze.add_argument("--type", help="Filter by node type")
+    p_analyze.add_argument("--flag", help="Filter by audit flag")
+    p_analyze.add_argument("--id", help="Filter by node ID")
+    p_analyze.add_argument("--json", action="store_true", help="Emit JSONL")
 
-    p_trap = subparsers.add_parser("trap")
+    p_trap = subparsers.add_parser("trap", help="Manage and run audit traps")
     p_trap.add_argument("trap_command", choices=["add", "clear", "list", "run"])
-    p_trap.add_argument("--on")
-    p_trap.add_argument("--action")
-    p_trap.add_argument("--project")
-
-    p_exec = subparsers.add_parser("exec")
-    p_exec.add_argument("command", nargs=argparse.REMAINDER)
+    p_trap.add_argument("--on", help="Trap condition (e.g. ON_RETRY)")
+    p_trap.add_argument("--action", help="Trap action (e.g. ACTION_HALT)")
+    p_trap.add_argument("--project", help="Project name")
 
     args = parser.parse_args()
 
@@ -209,13 +291,6 @@ def main():
     elif args.command == "translate": cmd_translate(args)
     elif args.command == "analyze": cmd_analyze(args)
     elif args.command == "trap": cmd_trap(args)
-    elif args.command == "exec":
-        if args.command and args.command[0] == "--":
-            args.command = args.command[1:]
-        if not args.command:
-            p_exec.print_help()
-            sys.exit(1)
-        cmd_exec(args)
 
 if __name__ == "__main__":
     sys.path.append(str(Path(__file__).parent))
