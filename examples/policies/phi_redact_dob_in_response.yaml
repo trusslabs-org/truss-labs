@@ -1,6 +1,6 @@
 schema_version: "1.0"
 policy_id: phi_redact_dob_in_response
-policy_version: v1.0
+policy_version: v1.1
 match:
   direction: response
   destination: any
@@ -9,6 +9,11 @@ match:
       - phi:patient_dob
 verdict: redact
 redact_config:
-  redact_with: "[REDACTED:{class}]"
+  # Neutral marker on purpose. A self-describing marker like
+  # "[REDACTED:phi:patient_dob]" looks like a system instruction to the
+  # model on subsequent turns and triggers it to spelunk for "the safety
+  # filter," derailing the conversation. The receipt still records the
+  # class — forensics live in the ledger, not in the chat history.
+  redact_with: "[redacted]"
 audit_only: false
 on_classifier_error: fail_open
