@@ -40,3 +40,6 @@ venv/
 # Tarball build staging — rebuilt by build-tarball.sh on every release.
 # The published artifact is www/public/demo/truss-primitives-v*.tar.gz.
 tmp/
+
+# Soul OS harness scratch — dragged-in images and per-session attachments.
+.soul/attachments/
