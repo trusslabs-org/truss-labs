@@ -15,7 +15,7 @@ import socket
 import importlib
 from pathlib import Path
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -24,7 +24,8 @@ except (AttributeError, ValueError):
     pass
 
 TRUSS_DIR = Path("~/.truss").expanduser()
-DEFAULT_RECEIPTS_DIR = TRUSS_DIR / "ledger/receipts"
+LEDGER_DIR = TRUSS_DIR / "ledger"
+DEFAULT_RECEIPTS_DIR = LEDGER_DIR / "receipts"
 VENV_DIR = TRUSS_DIR / "venv"
 VENV_PYTHON = VENV_DIR / "bin" / "python3"
 DEFAULT_PROXY_PORT = 8000
@@ -65,6 +66,9 @@ def ensure_bootstrap(packages=None):
     # 3. Always ensure basic dependencies are in the venv before we re-exec
     base_deps = ["fastapi", "uvicorn", "httpx", "pyyaml", "pydantic"]
     
+    # Merge with command-specific packages
+    all_to_install = list(set(base_deps + [p.split(":")[1] if ":" in p else p for p in packages]))
+    
     # Re-exec into the venv
     print(f"🛡️ Truss: Entering isolated environment...")
     
@@ -75,8 +79,15 @@ def ensure_bootstrap(packages=None):
 
 def cmd_install(args):
     """
-    Installs the truss CLI to ~/.local/bin
+    Installs the truss CLI to ~/.local/bin and bootstraps the ledger.
     """
+    # 1. Create Ledger Structure
+    print(f"🛡️ Bootstrapping Truss Ledger at {LEDGER_DIR}...")
+    subdirs = ["receipts", "tasks", "sessions", "teams", "specs"]
+    for sd in subdirs:
+        (LEDGER_DIR / sd).mkdir(parents=True, exist_ok=True)
+    
+    # 2. Install Binary
     bin_dir = Path("~/.local/bin").expanduser()
     bin_dir.mkdir(parents=True, exist_ok=True)
     dest = bin_dir / "truss"
@@ -319,7 +330,7 @@ def main():
     parser.add_argument("--version", action="version", version=f"truss {VERSION}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_install = subparsers.add_parser("install", help="Install truss CLI to ~/.local/bin")
+    p_install = subparsers.add_parser("install", help="Install truss CLI to ~/.local/bin and bootstrap ledger")
 
     p_index = subparsers.add_parser("index", help="Index receipts")
     p_index.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
