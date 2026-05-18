@@ -5,7 +5,7 @@
 #   "State belongs on disk, not in a vendor's database."
 #
 # One-liner:
-#   Your agent's memory is at ~/soul_registry/. Back it up with cp -r.
+#   Your agent's memory is at ~/truss/. Back it up with cp -r.
 #   Walk away from any vendor tomorrow.
 #
 # Clarity test:
@@ -37,7 +37,7 @@
 # PRIVACY NOTE
 # ------------------------------------------------------------------------
 #
-# This script is scoped to truss-labs/ on purpose. The ~/soul_registry/tasks/
+# This script is scoped to truss-labs/ on purpose. The ~/truss/tasks/
 # directory at the top level contains other project names (client work,
 # personal projects) that may be private. Do NOT run `ls tasks/` unscoped
 # during recording without reviewing what's there first.
@@ -47,7 +47,7 @@
 # ------------------------------------------------------------------------
 
 # [0:00] "The agent's memory lives on my disk. Here's the directory."
-cd ~/soul_registry
+cd ~/truss
 pwd
 
 # [0:07] "Organized by project."

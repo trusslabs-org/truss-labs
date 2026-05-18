@@ -5,7 +5,7 @@
 #
 # This test exercises the pipe mechanically against a fixture shaped like a
 # post-ingest TWP trace (node_id / type / audit_flags). The current
-# ~/soul_registry/traces/ directory holds hooks-event JSONL, which has a
+# ~/truss/traces/ directory holds hooks-event JSONL, which has a
 # different shape — a translator from hooks.jsonl → TWP node shape is a
 # separate concern (soul_ingest is currently LangChain-only).
 
@@ -40,7 +40,7 @@ set -e
 
 # Cleanup isolated trap config.
 python3 "$SCRIPT_DIR/soul_trap.py" clear > /dev/null
-rm -rf "$HOME/soul_registry/specs/$SOUL_PROJECT" 2>/dev/null || true
+rm -rf "$HOME/truss/specs/$SOUL_PROJECT" 2>/dev/null || true
 
 # Assert: pipe produced output, and halt trap fired (exit 1).
 if [ ! -s "$TRAP_EVENTS" ]; then

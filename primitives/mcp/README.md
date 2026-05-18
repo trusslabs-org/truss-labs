@@ -10,7 +10,7 @@ python primitives/mcp/truss_server.py
 ```
 
 Env vars:
-- `SOUL_REGISTRY` — registry root (default `~/soul_registry`)
+- `TRUSS_REGISTRY` — registry root (default `~/soul_registry`)
 - `SOUL_PROJECT` — active project key (default `ilteris-company`)
 
 ## Smoke test

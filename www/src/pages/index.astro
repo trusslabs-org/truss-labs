@@ -45,7 +45,7 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 				Truss Audit is not a hypothesis. It is the productized version of a tool I have been running for myself, on my own laptop, for the past six months.
 			</p>
 			<p class="text-dim leading-relaxed pt-3">
-				I run a local registry at <code>~/soul_registry/</code>. No external SaaS in the data path. Files I own, formats I control, queryable with <code>grep</code>, <code>jq</code>, and <code>truss</code> against the directory directly. Sessions distilled at close into an immutable record. Decisions logged to a ledger. Tasks tracked as JSON files I version-control.
+				I run a local registry at <code>~/truss/</code>. No external SaaS in the data path. Files I own, formats I control, queryable with <code>grep</code>, <code>jq</code>, and <code>truss</code> against the directory directly. Sessions distilled at close into an immutable record. Decisions logged to a ledger. Tasks tracked as JSON files I version-control.
 			</p>
 			<p class="text-dim leading-relaxed pt-3">
 				The architecture maps almost line-for-line onto what Truss Audit ships: task state becomes AI activity in <code>~/.truss/receipts/</code>; the session ledger becomes the receipt stream; the gates I wrote to keep agents from breaking my workflow become the policy YAML. Same shape — one for me, one for the customer.

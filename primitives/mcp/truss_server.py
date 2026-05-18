@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Truss Labs Sovereign Registry")
 
-REGISTRY_ROOT = Path(os.environ.get("SOUL_REGISTRY", os.path.expanduser("~/soul_registry")))
+REGISTRY_ROOT = Path(os.environ.get("TRUSS_REGISTRY", os.path.expanduser("~/truss")))
 DEFAULT_PROJECT = "truss-labs"
 
 

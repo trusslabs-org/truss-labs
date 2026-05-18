@@ -42,7 +42,7 @@ set -e
 
 # Cleanup.
 python3 "$SCRIPT_DIR/soul_trap.py" clear > /dev/null
-rm -rf "$HOME/soul_registry/specs/$SOUL_PROJECT" 2>/dev/null || true
+rm -rf "$HOME/truss/specs/$SOUL_PROJECT" 2>/dev/null || true
 
 # Assertions.
 if [ ! -s "$TRAP_EVENTS" ]; then

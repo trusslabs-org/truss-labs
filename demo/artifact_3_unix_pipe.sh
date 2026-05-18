@@ -68,7 +68,7 @@ export TRUSS_PROJECT="${TRUSS_PROJECT:-truss-labs-310-demo}"
 python3 primitives/scripts/truss_trap.py clear > /dev/null
 python3 primitives/scripts/truss_trap.py add --on ON_RETRY --action ACTION_HALT > /dev/null
 
-SESSION="$HOME/soul_registry/sessions/truss-labs/11810484-c02b-4497-9032-38dce49851d2"
+SESSION="$HOME/truss/sessions/truss-labs/11810484-c02b-4497-9032-38dce49851d2"
 
 # ------------------------------------------------------------------------
 # ON-CAMERA SEQUENCE
