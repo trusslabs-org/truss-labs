@@ -13,10 +13,11 @@ import subprocess
 import time
 import socket
 import importlib
+import shlex
 import shutil
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -30,12 +31,18 @@ DEFAULT_RECEIPTS_DIR = LEDGER_DIR / "receipts"
 VENV_DIR = TRUSS_DIR / "venv"
 VENV_PYTHON = VENV_DIR / "bin" / "python3"
 DEFAULT_PROXY_PORT = 8000
+PROXY_LOG = TRUSS_DIR / "proxy.log"
 
 def _sha256_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 def bootstrap_ledger():
     """Ensures ledger directory structure exists."""
+    TRUSS_DIR.mkdir(parents=True, exist_ok=True)
+    # Always ensure log file exists so tail doesn't fail
+    if not PROXY_LOG.exists():
+        PROXY_LOG.touch()
+    
     subdirs = ["receipts", "tasks", "sessions", "teams", "specs"]
     for sd in subdirs:
         (LEDGER_DIR / sd).mkdir(parents=True, exist_ok=True)
@@ -235,6 +242,14 @@ def cmd_exec(args):
     """
     truss exec [options] -- command args...
     """
+    # 1. Double check uvicorn is actually there
+    try:
+        import uvicorn
+        import google.genai  # noqa: F401
+    except ImportError:
+        print("🛡️ Truss: Missing proxy components. Bootstrapping...")
+        subprocess.check_call([str(VENV_PYTHON), "-m", "pip", "install", "uvicorn", "fastapi", "httpx", "pyyaml", "pydantic", "google-genai"])
+
     # Parse manual options
     policy = None
     port = DEFAULT_PROXY_PORT
@@ -273,12 +288,58 @@ def cmd_exec(args):
         if policy:
             proxy_env["TRUSS_POLICY_PATH"] = str(Path(policy).absolute())
         
-        # Start uvicorn in the background
+        # MANDATORY: Add primitives dir to PYTHONPATH so uvicorn can find the factory
+        # Resolve symlinks so an install at ~/.local/bin/truss finds the real source tree
+        script_dir = Path(__file__).resolve().parent
+        
+        # Search for the folder that SHOULD contain 'primitives' folder
+        # Case A: Source checkout - repo_root/primitives/scripts/truss.py
+        # Case B: Installed - ~/.truss/primitives/truss and ~/.truss/primitives/primitives/
+        
+        found_root = None
+        if (script_dir / "primitives" / "audit").exists():
+            found_root = script_dir
+        elif (script_dir.parent / "primitives" / "audit").exists():
+            found_root = script_dir.parent
+        elif (script_dir.parent.parent / "primitives" / "audit").exists():
+            found_root = script_dir.parent.parent
+        
+        if found_root:
+            proxy_env["PYTHONPATH"] = f"{found_root}:{proxy_env.get('PYTHONPATH', '')}"
+        else:
+            # Last ditch effort
+            proxy_env["PYTHONPATH"] = f"{script_dir}:{script_dir.parent}:{proxy_env.get('PYTHONPATH', '')}"
+
+        # Wire proxy env vars (mirrors examples/run_demo.sh). Defaults point at the
+        # in-repo example policies + shipped phi taxonomy so `truss exec` works out of the box.
+        if found_root:
+            default_policies = found_root / "examples" / "policies"
+            default_taxonomy = found_root / "primitives" / "audit" / "taxonomies" / "phi.yaml"
+            if policy:
+                proxy_env["TRUSS_POLICIES_DIR"] = str(Path(policy).expanduser().absolute())
+            else:
+                proxy_env.setdefault("TRUSS_POLICIES_DIR", str(default_policies))
+            proxy_env.setdefault("TRUSS_TAXONOMIES", str(default_taxonomy))
+        proxy_env.setdefault("TRUSS_RECEIPTS_DIR", str(DEFAULT_RECEIPTS_DIR))
+        # Truss never holds upstream LLM creds on these surfaces — the client
+        # (gemini-cli, claude) forwards its own x-goog-api-key / x-api-key in
+        # the request headers, and truss relays them upstream.
+
+
+        # Ensure log dir exists
+        TRUSS_DIR.mkdir(parents=True, exist_ok=True)
+        # Start uvicorn in the background, redirecting logs to proxy.log
+        log_file = open(PROXY_LOG, "a", buffering=1) # line buffered
+        log_file.write(f"\n--- Truss Proxy Start v{VERSION} ---\n")
+        log_file.write(f"CWD: {os.getcwd()}\n")
+        log_file.write(f"PYTHONPATH: {proxy_env.get('PYTHONPATH')}\n")
+        log_file.write(f"SCRIPT_DIR: {script_dir}\n")
+        
         proxy_proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "primitives.audit.proxy:create_app_from_env", "--port", str(port), "--factory"],
             env=proxy_env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stdout=log_file,
+            stderr=log_file
         )
         
         # Wait for proxy to start
@@ -288,7 +349,7 @@ def cmd_exec(args):
             retries -= 1
         
         if retries == 0:
-            print("Error: Truss Audit Proxy failed to start.", file=sys.stderr)
+            print(f"Error: Truss Audit Proxy failed to start. Check {PROXY_LOG}", file=sys.stderr)
             if proxy_proc: proxy_proc.terminate()
             sys.exit(1)
         print("🛡️ Truss Audit Proxy ready.")
@@ -298,10 +359,15 @@ def cmd_exec(args):
     # 2. Prepare Environment
     env = os.environ.copy()
     proxy_url = f"http://localhost:{port}"
-    env["HTTP_PROXY"] = proxy_url
-    env["HTTPS_PROXY"] = proxy_url
-    env["http_proxy"] = proxy_url
-    env["https_proxy"] = proxy_url
+
+    # Reverse-proxy path for clients that honor a base-URL env var.
+    # - @google/genai (gemini-cli) honors GOOGLE_GEMINI_BASE_URL
+    # - claude (Anthropic CLI) honors ANTHROPIC_BASE_URL
+    # We deliberately do NOT set HTTPS_PROXY: gemini-cli routes every fetch
+    # through it without honoring NO_PROXY, causing the SDK to try to
+    # CONNECT-tunnel through truss to reach truss itself.
+    env["GOOGLE_GEMINI_BASE_URL"] = proxy_url
+    env["ANTHROPIC_BASE_URL"] = proxy_url
     
     # Inject paths for local agent discovery
     local_bin = str(Path("~/.local/bin").expanduser())
@@ -324,11 +390,12 @@ def cmd_exec(args):
             result = subprocess.run(command, env=env)
         else:
             # Command not found as file - likely a shell function. 
-            # We wrap it in zsh -i -c to allow it to be found.
-            shell_cmd = " ".join(command)
+            # We wrap it in zsh -i -l -c to allow it to be found.
+            shell_cmd = f"export GOOGLE_GEMINI_BASE_URL={proxy_url} ANTHROPIC_BASE_URL={proxy_url}; "
+            shell_cmd += " ".join(shlex.quote(c) for c in command)
+
             print(f"🛡️ Executing shell command: {shell_cmd}")
-            # Use zsh -i to load aliases/functions from .zshrc
-            result = subprocess.run(["zsh", "-i", "-c", shell_cmd], env=env)
+            result = subprocess.run(["zsh", "-i", "-l", "-c", shell_cmd], env=env)
             
         sys.exit(result.returncode)
     except KeyboardInterrupt:
@@ -344,8 +411,6 @@ def cmd_exec(args):
 
 def main():
     # MANDATORY: Bootstrap directories before anything else
-    if not LEDGER_DIR.exists():
-        print(f"🛡️ Initializing Truss Ledger at {LEDGER_DIR}...")
     bootstrap_ledger()
 
     # If no arguments, print header and help
@@ -434,9 +499,10 @@ def main():
         cmd_exec(args)
 
 if __name__ == "__main__":
-    # Ensure local primitives are importable
-    repo_root = Path(__file__).parent.parent.parent
+    # Ensure local primitives are importable (resolve symlinks for ~/.local/bin/truss)
+    here = Path(__file__).resolve()
+    repo_root = here.parent.parent.parent
     sys.path.append(str(repo_root))
-    sys.path.append(str(Path(__file__).parent))
+    sys.path.append(str(here.parent))
     
     main()
