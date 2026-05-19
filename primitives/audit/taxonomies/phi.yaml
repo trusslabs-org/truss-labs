@@ -35,8 +35,12 @@ classes:
 
   - class: patient_dob
     recognizer: regex
-    # DOB: 03/14/1972 | born 03/14/1972 | DOB 1972-03-14
-    pattern: '\b(?:DOB|date of birth|born(?:\s+on)?)[:\s]+(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b'
+    # Catches both numeric and natural-language month-name DOB formats:
+    #   numeric:      DOB: 03/14/1972 | born 03/14/1972 | DOB 1972-03-14
+    #   month-name:   born April 12, 1978 | DOB April 12 1978 | born 12 April 1978
+    # Trigger word ("DOB", "date of birth", "born", "born on") followed by
+    # punctuation/whitespace, then a date in one of four shape families.
+    pattern: '\b(?:DOB|date of birth|born(?:\s+on)?)[:\s,]+(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{2,4}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{2,4})\b'
 
   - class: diagnosis_code
     recognizer: regex

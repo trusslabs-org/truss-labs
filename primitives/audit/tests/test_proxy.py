@@ -101,7 +101,7 @@ class BlockPath(ProxyBase):
 
 
 # ---------------------------------------------------------------------------
-# Redact path: DOB in response → response returned with [REDACTED:phi:patient_dob]
+# Redact path: DOB in response → response returned with [redacted] in place
 # ---------------------------------------------------------------------------
 
 
@@ -121,7 +121,7 @@ class RedactPath(ProxyBase):
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertEqual(body["verdict"], "redacted")
-        self.assertIn("[REDACTED:phi:patient_dob]", body["response"])
+        self.assertIn("[redacted]", body["response"])
         self.assertNotIn("1978-04-12", body["response"])
 
     def test_redacted_response_receipt_carries_redaction(self) -> None:
