@@ -176,6 +176,24 @@
   <p>Truss sits between an agent and an LLM. Every call passes through a YAML policy that can allow, redact, or block — and every call writes a hash-verifiable receipt to disk. The receipt is what your auditor reads, not the chat log.</p>
   <p class="sub">Flow: prompt → classifier → policy → LLM → receipt. The verdict and receipt path below are produced server-side from your YAML rules.</p>
 
+  <h2 style="margin-top:2rem;">See it in a real CLI session</h2>
+  <p class="sub">The 90-second cast below wraps <code>gemini-cli</code> with <code>truss exec</code> and walks the full demo loop — block on patient address, redact on DOB, multi-turn followup, ledger verify. Provider-agnostic: <code>truss exec -- claude</code> uses the same flow.</p>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/asciinema-player.css">
+  <div id="cast-player" style="margin: 1rem 0; border: 1px solid var(--sys-color-outline); border-radius: 4px; overflow: hidden;"></div>
+  <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/asciinema-player.min.js"></script>
+  <script>
+    if (window.AsciinemaPlayer) {
+      AsciinemaPlayer.create(
+        'https://trusslabs.org/demo/truss-exec-wrap.cast',
+        document.getElementById('cast-player'),
+        { autoPlay: true, loop: true, speed: 0.7, theme: 'asciinema', fit: 'width', controls: true }
+      );
+    }
+  </script>
+
+  <h2 style="margin-top:2rem;">Or try one turn yourself</h2>
+  <p class="sub">Single-turn HTTP form against the same proxy backend. Submit a prompt; see the verdict and the receipt that gets written to disk. For the multi-turn / swap-table demo, install the CLI (see homepage) and run <code>truss exec -- gemini-cli</code> yourself.</p>
+
   <label for="endpoint">Proxy endpoint</label>
   <input id="endpoint" value="/v1/chat">
 
