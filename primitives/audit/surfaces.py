@@ -3,6 +3,7 @@
 Each adapter knows how to:
   - extract the latest user prompt text + the assistant response text
   - replace assistant message text in-place (for redaction swap-back)
+  - strip prior block-exchange pairs from history (for block-history strip)
   - redact a response payload in-place (collapse text parts/blocks)
   - construct a block payload in the surface's response shape
 
@@ -11,8 +12,13 @@ The middleware chain is otherwise surface-agnostic.
 
 from __future__ import annotations
 
+import hashlib
 import time
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, Iterator, List, Set, Tuple
+
+
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +132,40 @@ class GeminiSurface:
             }],
             "modelVersion": model,
         }
+
+    @staticmethod
+    def strip_block_exchanges(body: Dict[str, Any], drop_hashes: Set[str]) -> Tuple[Dict[str, Any], int]:
+        """Walk contents[]; for any model turn whose concatenated text hashes
+        into `drop_hashes`, drop that turn AND the immediately preceding user
+        turn. Preserves alternation; presents the exchange to the model as if
+        it never happened. Returns (new_body, count_of_pairs_dropped).
+        """
+        contents = body.get("contents", []) or []
+        new_contents: List[Dict[str, Any]] = []
+        dropped = 0
+        for content in contents:
+            if not isinstance(content, dict):
+                new_contents.append(content)
+                continue
+            if content.get("role") == "model":
+                text_parts: List[str] = []
+                for part in content.get("parts", []) or []:
+                    if isinstance(part, dict):
+                        t = part.get("text")
+                        if t:
+                            text_parts.append(t)
+                text = "\n\n".join(text_parts)
+                if text and _hash_text(text) in drop_hashes:
+                    # Drop this model turn AND the immediately preceding user turn (if any)
+                    if new_contents and isinstance(new_contents[-1], dict) and new_contents[-1].get("role") == "user":
+                        new_contents.pop()
+                    dropped += 1
+                    continue
+            new_contents.append(content)
+        if dropped:
+            body = dict(body)
+            body["contents"] = new_contents
+        return body, dropped
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +282,42 @@ class AnthropicSurface:
             "stop_sequence": None,
             "usage": {"input_tokens": 0, "output_tokens": 0},
         }
+
+    @staticmethod
+    def strip_block_exchanges(body: Dict[str, Any], drop_hashes: Set[str]) -> Tuple[Dict[str, Any], int]:
+        """Walk messages[]; for any assistant message whose text hashes into
+        `drop_hashes`, drop it AND the immediately preceding user message.
+        Anthropic enforces alternation more strictly than Gemini — dropping
+        the pair preserves it. Returns (new_body, count_of_pairs_dropped).
+        """
+        messages = body.get("messages", []) or []
+        new_messages: List[Dict[str, Any]] = []
+        dropped = 0
+        for msg in messages:
+            if not isinstance(msg, dict):
+                new_messages.append(msg)
+                continue
+            if msg.get("role") == "assistant":
+                content = msg.get("content")
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    text_parts: List[str] = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            t = block.get("text")
+                            if t:
+                                text_parts.append(t)
+                    text = "\n\n".join(text_parts)
+                else:
+                    text = ""
+                if text and _hash_text(text) in drop_hashes:
+                    if new_messages and isinstance(new_messages[-1], dict) and new_messages[-1].get("role") == "user":
+                        new_messages.pop()
+                    dropped += 1
+                    continue
+            new_messages.append(msg)
+        if dropped:
+            body = dict(body)
+            body["messages"] = new_messages
+        return body, dropped
