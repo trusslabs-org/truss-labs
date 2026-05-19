@@ -58,27 +58,42 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 		<div class="pt-4">
 			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Show me</h2>
 			<p class="text-dim leading-relaxed mb-6">
-				Below is 383 lines of an AI agent's tool-call log — a real session from this laptop's registry, JSONL on disk. Three small command-line tools, piped together, find every retry loop the agent got stuck in. <code class="text-accent">TRAP-1</code> is the halt event.
+				One command wraps any agent CLI in a local audit proxy. Every prompt and response flows through a policy chain — classify, evaluate, optionally block or redact — and writes a hash-verifiable JSON receipt to disk. The model never sees what your policy doesn't let it see.
 			</p>
 
 			<div id="asciinema-demo" class="my-8 rounded border border-white/10 overflow-hidden"></div>
 
 			<p class="text-dim text-sm leading-relaxed pb-3">
-				Run the primitives locally:
+				Wrap your agent CLI:
 			</p>
-			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Download and unpack the primitives
+			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Install (bootstraps a private venv + ledger under ~/.truss/)
 curl -sSL https://trusslabs.org/install.sh | bash
 
-# Add a trap for circular reasoning (retries) and run the pipe
-./truss trap add --on ON_RETRY --action ACTION_HALT
-cat hooks.jsonl | ./truss translate | ./truss analyze --json --flag FLAG_CIRCULAR_REASONING | ./truss trap run</code></pre>
+# Wrap gemini-cli (works the same for `claude` — sets ANTHROPIC_BASE_URL)
+truss exec -- gemini-cli
+
+# Inside the wrapped CLI, ask something that contains a patient address:
+#   → Patient lives at 1234 Main St. Summarize their case.
+# Truss intercepts before the model sees it. Receipt:
+ls ~/.truss/ledger/receipts/$(date -u +%F)/
+
+# An auditor can verify every receipt in the ledger:
+truss verify ~/.truss/ledger/receipts</code></pre>
 
 			<p class="text-dim text-sm leading-relaxed pt-4">
-				Same shell vocabulary you already use, applied to your agent's behavior. Files on disk, pipes between them. Replace <code>head -3</code> with <code>grep</code>, <code>jq</code>, <code>awk</code>, your own scripts — that's the point.
+				Provider-agnostic by design — Gemini and Claude both wired today; OpenAI is the same reverse-proxy shape. Truss holds no upstream model credentials. The wrapped CLI's own API key (or OAuth token) flows through the inbound request and truss forwards it.
 			</p>
 			<p class="text-dim text-sm leading-relaxed pt-3">
-				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a> — clone it, point the pipe at any session log you already have.
+				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
 			</p>
+		</div>
+
+		<div class="pt-4">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Also: offline trace analysis</h2>
+			<p class="text-dim text-sm leading-relaxed">
+				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss translate</code> turns hooks.jsonl into traceable nodes, <code>truss analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
+			</p>
+			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss translate | truss analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
 		</div>
 
 		<div class="pt-4">
@@ -91,7 +106,7 @@ cat hooks.jsonl | ./truss translate | ./truss analyze --json --flag FLAG_CIRCULA
 			import * as AsciinemaPlayer from 'asciinema-player';
 			const target = document.getElementById('asciinema-demo');
 			if (target) {
-				AsciinemaPlayer.create('/demo/artifact_3_unix_pipe.cast', target, {
+				AsciinemaPlayer.create('/demo/truss-exec-wrap.cast', target, {
 					autoPlay: true,
 					loop: true,
 					speed: 0.7,
