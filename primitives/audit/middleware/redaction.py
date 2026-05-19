@@ -22,17 +22,27 @@ anchored or tokenized variants (future work).
 from __future__ import annotations
 
 import hashlib
-import logging
+import sys
 from typing import Any, Dict, Optional
 
 from .base import RouteContext, TrussMiddleware
 
 
-log = logging.getLogger("truss.audit.redaction")
-
-
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _log(msg: str) -> None:
+    # Use sys.stderr.write directly (same path that works at module-import
+    # time — confirmed during diagnosis). `print(..., file=sys.stderr)` and
+    # `os.write(2, ...)` both silently dropped in async request context;
+    # this path lands in proxy.log because truss exec wires the subprocess
+    # stderr to that file.
+    try:
+        sys.stderr.write(f"[truss.redaction] {msg}\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
 
 
 class RedactionMiddleware(TrussMiddleware):
@@ -59,7 +69,7 @@ class RedactionMiddleware(TrussMiddleware):
                 ctx.surface.replace_assistant_message_text(msg, original)
                 swaps += 1
         if swaps:
-            log.info("redaction: swapped %d assistant message(s) back to original before forwarding", swaps)
+            _log(f"redaction: swapped {swaps} assistant message(s) back to original before forwarding")
         return body if swaps else None
 
     def after_upstream(self, payload: Dict[str, Any], ctx: RouteContext) -> Optional[Dict[str, Any]]:
@@ -75,5 +85,5 @@ class RedactionMiddleware(TrussMiddleware):
         # Key on the *redacted* (client-visible) text; value is what we'd
         # want the model to see on the next turn.
         self._table[_hash(ctx.final_response_text)] = ctx.original_response_text
-        log.info("redaction: stored swap entry (redacted -> original)")
+        _log("redaction: stored swap entry (redacted -> original)")
         return None

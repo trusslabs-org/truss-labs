@@ -48,13 +48,17 @@ class MiddlewareChain:
         `stream_emitter` is a callable that wraps a payload dict in a
         StreamingResponse with the surface-appropriate SSE shape.
         """
-        # Pre-upstream phase
+        # Pre-upstream phase — run every hook so trailing middlewares
+        # (notably ReceiptMiddleware) can react to a block set by an earlier
+        # one. The block short-circuits the *upstream forward*, not the
+        # middleware chain itself.
         for mw in self.before:
             replacement = mw.before_upstream(body, ctx)
             if replacement is not None:
                 body = replacement
-            if ctx.block_payload is not None:
-                return self._respond(ctx.block_payload, ctx, stream_emitter)
+
+        if ctx.block_payload is not None:
+            return self._respond(ctx.block_payload, ctx, stream_emitter)
 
         # Upstream forward
         try:
@@ -72,13 +76,15 @@ class MiddlewareChain:
         ctx.upstream_payload = payload
         ctx.llm_meta = {"latency_ms": latency_ms}
 
-        # Post-upstream phase
+        # Post-upstream phase — same shape: run every hook, then short-circuit
+        # at the end if any of them blocked.
         for mw in self.after:
             replacement = mw.after_upstream(payload, ctx)
             if replacement is not None:
                 payload = replacement
-            if ctx.block_payload is not None:
-                return self._respond(ctx.block_payload, ctx, stream_emitter)
+
+        if ctx.block_payload is not None:
+            return self._respond(ctx.block_payload, ctx, stream_emitter)
 
         # Stamp the receipt path on the returned body
         if ctx.receipt_path:

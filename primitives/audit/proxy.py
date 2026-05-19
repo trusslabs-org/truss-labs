@@ -208,10 +208,13 @@ def create_app(
         RedactionMiddleware,
         ReceiptMiddleware,
     )
+    # Order matters: PolicyMiddleware.after_upstream populates ctx.response_eval
+    # and ctx.final_response_text, which RedactionMiddleware.after_upstream
+    # needs to record a swap entry. Receipt runs last.
     chain = MiddlewareChain([
         ClassifyMiddleware(classifiers=classifiers),
-        RedactionMiddleware(),
         PolicyMiddleware(policy_set=policy_set),
+        RedactionMiddleware(),
         ReceiptMiddleware(writer=writer),
     ])
 
