@@ -102,7 +102,7 @@ While the user's local terminal and logs remain completely clean:
 
 ## Alignment over mechanics
 
-This is why Truss is a separate governance substrate and not just a regex filter in your SDK. 
+This is why Truss is a separate governance layer and not just a regex filter in your SDK. 
 
 To govern agents, the proxy must understand the protocol (Gemini/Claude API structures) and hold state across turns to protect the model's reasoning while guaranteeing the security boundary.
 

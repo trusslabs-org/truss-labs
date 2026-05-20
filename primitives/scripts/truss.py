@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-truss — The high-level, noun-first CLI for the Truss Audit substrate.
+truss — The high-level, noun-first CLI for the Truss Audit engine.
 """
 
 import hashlib
@@ -499,7 +499,7 @@ def main():
 
     # Help output on bare execution
     if len(sys.argv) == 1:
-        print(f"🛡️ Truss Audit Substrate (v{VERSION})")
+        print(f"🛡️ Truss Audit Engine (v{VERSION})")
         print("--------------------------------")
         parser = argparse.ArgumentParser(prog="truss")
         parser.add_argument("--version", action="version", version=f"truss {VERSION}")
@@ -512,7 +512,7 @@ def main():
         parser.print_help()
         return
 
-    parser = argparse.ArgumentParser(prog="truss", description="🛡️ Truss Audit Substrate")
+    parser = argparse.ArgumentParser(prog="truss", description="🛡️ Truss Audit Engine")
     parser.add_argument("--version", action="version", version=f"truss {VERSION}")
     subparsers = parser.add_subparsers(dest="noun", required=True)
 
