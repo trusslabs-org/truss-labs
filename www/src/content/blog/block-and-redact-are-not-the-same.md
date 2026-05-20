@@ -100,7 +100,7 @@ While the user's local terminal and logs remain completely clean:
 > Yes, and does that born [REDACTED_DOB] match the intake chart?
 ```
 
-## Alignment over mechanics
+## Policy over mechanics
 
 This is why Truss is a separate governance layer and not just a regex filter in your SDK. 
 
