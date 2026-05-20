@@ -1,0 +1,214 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="CLI Documentation" description="The official command-line reference for the Truss Audit substrate.">
+	<div class="md:grid md:grid-cols-4 md:gap-10">
+		<!-- Sidebar navigation -->
+		<aside class="hidden md:block col-span-1 text-sm sticky top-12 h-fit">
+			<h3 class="text-accent mb-4 uppercase tracking-wider text-xs font-semibold select-none">Manual</h3>
+			<ul class="space-y-3 font-mono">
+				<li><a href="#install" class="hover:text-white text-dim hover:no-underline">Bootstrap</a></li>
+				<li><a href="#proxy" class="hover:text-white text-dim hover:no-underline">proxy</a></li>
+				<li><a href="#receipt" class="hover:text-white text-dim hover:no-underline">receipt</a></li>
+				<li><a href="#trace" class="hover:text-white text-dim hover:no-underline">trace</a></li>
+				<li><a href="#trap" class="hover:text-white text-dim hover:no-underline">trap</a></li>
+				<li><a href="#mcp" class="hover:text-white text-dim hover:no-underline">MCP Integration</a></li>
+			</ul>
+		</aside>
+
+		<!-- Main manual content -->
+		<div class="col-span-3 space-y-16">
+			<div>
+				<h1 class="text-3xl text-accent font-medium mb-4 tracking-tight">The Truss CLI Manual</h1>
+				<p class="text-dim text-sm leading-relaxed mb-6">
+					Truss is designed as a standalone, developer-controlled governance substrate. The unified <code>truss</code> binary sits locally on your host, orchestrating local proxies, evaluating real-time policy rules, auditing trace DAGs, and writing cryptographic JSON receipts to disk.
+				</p>
+				<p class="text-dim text-sm leading-relaxed">
+					This document details the noun-first CLI grammar introduced in version 0.3.1.
+				</p>
+			</div>
+
+			<!-- Installation / Bootstrapping -->
+			<section id="install" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">1. Bootstrap & Installation</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					Bootstrapping initializes the private environment (including a nested Python virtualenv to isolate dependencies like DuckDB and FastAPI) and links the global executable to your local path.
+				</p>
+				<div class="space-y-4">
+					<div class="bg-black/30 border border-white/5 p-4 rounded font-mono text-xs text-dim space-y-2">
+						<span class="text-white font-bold">truss install</span>
+						<p class="pl-4">Bootstraps the local folder structure under <code>~/.truss/</code>, initializes the ledger database partitions, and symlinks the <code>truss</code> binary into <code>~/.local/bin/truss</code>.</p>
+					</div>
+					<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Standard internet installer
+curl -sSL https://trusslabs.org/install.sh | bash</code></pre>
+				</div>
+			</section>
+
+			<!-- proxy subparser -->
+			<section id="proxy" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">2. proxy — Daemon Governance</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					The <code>proxy</code> namespace controls the local reverse-proxy daemon that intercepts SDK and agent traffic before relaying it to providers like Gemini or Anthropic.
+				</p>
+				
+				<div class="space-y-6">
+					<!-- proxy exec -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss proxy exec [--policy DIR] [--port PORT] -- &lt;command&gt;</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Starts the local uvicorn proxy and maps outbound base-URL variables (<code>GOOGLE_GEMINI_BASE_URL</code>, <code>ANTHROPIC_BASE_URL</code>) into the environment of the child shell, executing your agentic workloads under real-time policy filters.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Wrap a gemini-cli session with a local HIPAA-PHI policy
+truss proxy exec --policy ~/policies/phi/ -- gemini-cli</code></pre>
+					</div>
+
+					<!-- proxy status -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss proxy status</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Probes the local proxy port (default: 8000), checks for active process IDs (PIDs), prints logging directory configurations, and tails the last 10 lines of the proxy server daemon log.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>truss proxy status</code></pre>
+					</div>
+
+					<!-- proxy stop -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss proxy stop [--port PORT]</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Surgically stops any active Truss Audit Proxy daemon bound to the target port by issuing a standard termination signal (SIGTERM) followed by a force-kill signal (SIGKILL) if the daemon remains unresponsive.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>truss proxy stop --port 8000</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<!-- receipt subparser -->
+			<section id="receipt" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">3. receipt — Audit & Query Substrate</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					Receipts are cryptographic, hash-verifiable logs written locally to <code>~/.truss/ledger/receipts/</code> for every intercepted chat transaction.
+				</p>
+
+				<div class="space-y-6">
+					<!-- receipt list -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss receipt list [path]</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Scans and counts all valid audit receipts in the specified directory. Defaults to <code>~/.truss/ledger/receipts/</code>.
+						</p>
+					</div>
+
+					<!-- receipt verify -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss receipt verify [path]</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Validates cryptographic tampering of receipt JSON files. Re-computes each receipt signature by zeroing the <code>receipt_hash</code> element, canonicalizing the JSON, and verifying the resulting SHA-256 against the stored hash.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>truss receipt verify ~/.truss/ledger/receipts/2026-05-19/</code></pre>
+					</div>
+
+					<!-- receipt query -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss receipt query "SQL"</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Executes lightning-fast SQL queries against local JSON receipt records using an integrated **DuckDB** analytics engine. Use <code>receipts</code> as the virtual table name.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Find all blocked prompt requests
+truss receipt query "SELECT timestamp, verdict, model FROM receipts WHERE verdict = 'blocked'"</code></pre>
+					</div>
+
+					<!-- receipt report -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss receipt report</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Generates a high-level developer activity report breaking down volume statistics by day, sensitive data classes touched, and policy verdicts applied.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>truss receipt report</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<!-- trace subparser -->
+			<section id="trace" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">4. trace — Causal Logging & Analysis</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					Session traces represent the causal DAG (directed acyclic graph) of agentic executions: tool calls, reasoning steps, and prompts.
+				</p>
+
+				<div class="space-y-6">
+					<!-- trace translate -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss trace translate [input] [output]</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Translates raw, unstructured session hooks (e.g., standard <code>hooks.jsonl</code> logs) into structured, causal TWP (Truss Wire Protocol) JSON lines to prepare them for pipeline queries.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>cat session/hooks.jsonl | truss trace translate > trace_dag.jsonl</code></pre>
+					</div>
+
+					<!-- trace analyze -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss trace analyze [trace] [--flag FLAG]</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Scans translated trace lines from stdin or a trace file to detect loops, circular reasoning, and low confidence scores. Supports JSON stream output.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Filter and display all nodes containing a retry/circular loop
+truss trace analyze trace_dag.jsonl --flag FLAG_CIRCULAR_REASONING</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<!-- trap subparser -->
+			<section id="trap" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">5. trap — Semantic Safety Breakpoints</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					Traps allow you to define rules that catch and block agentic failures (e.g., infinite tool retries or severe confidence drops) on standard trace streams.
+				</p>
+
+				<div class="space-y-6">
+					<!-- trap add -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss trap add --on COND --action ACTION</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Adds an active breakpoint. Supported conditions are <code>ON_ERROR</code>, <code>ON_RETRY</code>, <code>ON_CONFIDENCE_LOW</code>, and <code>ON_STATE_DRIFT</code>. Supported actions are <code>ACTION_HALT</code>, <code>ACTION_SOCRATIC</code>, and <code>ACTION_BRANCH</code>.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Break and halt session if an infinite retry loop is detected
+truss trap add --on ON_RETRY --action ACTION_HALT</code></pre>
+					</div>
+
+					<!-- trap run -->
+					<div class="space-y-2">
+						<h3 class="text-md text-white font-mono">truss trap run</h3>
+						<p class="text-dim text-sm leading-relaxed">
+							Pipes trace inputs through evaluated trap criteria. Exits with code 1 and writes trigger events to stdout if any <code>ACTION_HALT</code> matches.
+						</p>
+						<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>cat trace_dag.jsonl | truss trace analyze --json | truss trap run</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<!-- mcp integration -->
+			<section id="mcp" class="space-y-4">
+				<h2 class="text-xl text-accent border-b border-white/10 pb-2">6. Model Context Protocol (MCP) Integration</h2>
+				<p class="text-dim text-sm leading-relaxed">
+					Truss exposes its local registry, tasks, and session traces directly to supporting MCP clients (such as Zed, Claude Desktop, or VS Code) using stdio transport.
+				</p>
+				<p class="text-dim text-sm leading-relaxed">
+					To register the server, point your MCP client configuration to execute our server script:
+				</p>
+				<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Register with Claude Desktop or Cursor
+{
+  "mcpServers": {
+    "truss-labs": {
+      "command": "python3",
+      "args": ["/absolute/path/to/truss-labs/primitives/mcp/truss_server.py"]
+    }
+  }
+}</code></pre>
+				<p class="text-dim text-sm leading-relaxed">
+					Once connected, your client has access to direct registry query tools and trace resource templates (e.g. <code>truss://registry/active</code>).
+				</p>
+			</section>
+		</div>
+	</div>
+</Layout>
