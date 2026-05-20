@@ -20,12 +20,12 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 		</div>
 
 		<div class="mb-16">
-			<div class="relative w-full rounded border border-white/10 bg-black/40 overflow-hidden shadow-2xl mb-6">
-				<div class="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+			<div class="relative w-full rounded border border-border-dim bg-black/40 overflow-hidden shadow-2xl mb-6">
+				<div class="flex items-center gap-2 px-4 py-3 border-b border-border-dim bg-surface">
 					<div class="flex gap-1.5">
-						<span class="w-3 h-3 rounded-full bg-white/10"></span>
-						<span class="w-3 h-3 rounded-full bg-white/10"></span>
-						<span class="w-3 h-3 rounded-full bg-white/10"></span>
+						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
+						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
+						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 					</div>
 					<span class="text-xs text-dim font-mono select-none mx-auto pr-6">demo.trusslabs.org</span>
 				</div>
@@ -42,7 +42,7 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 			<p class="text-dim text-sm leading-relaxed mb-4">
 				You don't need to rebuild your agents or modify their codebase. Truss wraps existing tools (like <code>gemini-cli</code>, in-house python pipelines, Cursor, or SDK-based agents) by pointing their client base-URLs at a local uvicorn proxy on your machine.
 			</p>
-			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Install (bootstraps a private venv + ledger under ~/.truss/)
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Install (bootstraps a private venv + ledger under ~/.truss/)
 curl -sSL https://trusslabs.org/install.sh | bash
 
 # Wrap gemini-cli (works the same for `claude` — sets ANTHROPIC_BASE_URL)
@@ -69,7 +69,7 @@ truss receipt verify ~/.truss/ledger/receipts</code></pre>
 			<p class="text-dim text-sm leading-relaxed">
 				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss trace translate</code> turns hooks.jsonl into traceable nodes, <code>truss trace analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
 			</p>
-			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
 		</div>
 
 		<div class="pt-4">
