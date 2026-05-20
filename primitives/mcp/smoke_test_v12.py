@@ -7,7 +7,7 @@ Tests the five v1.2-specific gaps NOT covered by smoke_test.py:
   4. query_registry substring search — returns a matching task.
   5. Session-not-found error path — bogus session_id → well-formed JSON error.
 
-Spawns truss_server.py with a temporary registry so the real ~/soul_registry is
+Spawns truss_server.py with a temporary registry so the real registry is
 untouched. Exits 0 only if all five checks pass.
 """
 import asyncio
@@ -71,8 +71,8 @@ def result_line(check: str, passed: bool, detail: str = "") -> str:
 async def run(tmpdir: Path) -> int:
     env = {
         **os.environ,
-        "SOUL_REGISTRY": str(tmpdir),
-        "SOUL_PROJECT": PROJECT,
+        "TRUSS_REGISTRY": str(tmpdir),
+        "TRUSS_PROJECT": PROJECT,
     }
     params = StdioServerParameters(
         command=sys.executable,
@@ -194,7 +194,6 @@ async def run(tmpdir: Path) -> int:
             # ------------------------------------------------------------------
             bogus_resp = await session.read_resource("truss://trace/dag/does_not_exist_xyz")
             bogus_body = json.loads(bogus_resp.contents[0].text)
-            # Spec/impl documents "session_not_found" as the error value
             ok5 = (
                 isinstance(bogus_body, dict)
                 and bogus_body.get("error") == "session_not_found"

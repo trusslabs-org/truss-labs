@@ -1,7 +1,7 @@
 """Truss MCP Resource Server — TWP v1.2 MVP prototype.
 
 Spec: docs/research/TWP_ON_MCP_SPEC.md
-Exposes the Sovereign Registry over the Model Context Protocol (stdio transport).
+Exposes the Truss Registry over the Model Context Protocol (stdio transport).
 """
 import json
 import os
@@ -10,14 +10,14 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("Truss Labs Sovereign Registry")
+mcp = FastMCP("Truss Labs Registry")
 
-REGISTRY_ROOT = Path(os.environ.get("TRUSS_REGISTRY", os.path.expanduser("~/.truss/ledger"))))
+REGISTRY_ROOT = Path(os.environ.get("TRUSS_REGISTRY", os.path.expanduser("~/.truss/ledger")))
 DEFAULT_PROJECT = "truss-labs"
 
 
 def _project() -> str:
-    return os.environ.get("SOUL_PROJECT", DEFAULT_PROJECT)
+    return os.environ.get("TRUSS_PROJECT", DEFAULT_PROJECT)
 
 
 def _log(msg: str) -> None:
@@ -26,7 +26,7 @@ def _log(msg: str) -> None:
 
 @mcp.resource("truss://registry/active")
 def registry_active() -> str:
-    """Snapshot of the active project's Sovereign Registry tasks."""
+    """Snapshot of the active project's Truss Registry tasks."""
     project = _project()
     task_dir = REGISTRY_ROOT / "tasks" / project
     if not task_dir.exists():
@@ -53,7 +53,6 @@ def trace_dag_sessions() -> str:
         return json.dumps({"project": project, "sessions": []})
 
     sessions = []
-    # Project traces are partitioned by host to prevent sync collisions
     for host_dir in sorted(trace_dir.iterdir()):
         if not host_dir.is_dir():
             continue
@@ -93,7 +92,6 @@ def trace_dag_session(session_id: str) -> str:
                         continue
                     try:
                         node = json.loads(line)
-                        # TWP v1.2: Every node must carry a provenance field
                         if "provenance" not in node:
                             node["provenance"] = "PROV_NATURAL"
                         nodes.append(node)
@@ -107,7 +105,6 @@ def trace_dag_session(session_id: str) -> str:
         parent = n.get("parent_id")
         node_id = n.get("node_id")
         if parent and node_id:
-            # TWP v1.2: Classify edges based on node metadata
             edge_type = "CAUSAL_LINK"
             if n.get("provenance") == "PROV_INJECTED":
                 edge_type = "INJECTION_LINK"
@@ -121,7 +118,7 @@ def trace_dag_session(session_id: str) -> str:
 
 @mcp.tool()
 def query_registry(query: str, project_key: str | None = None) -> str:
-    """Substring-search task JSON in the registry (The Search in Search-to-Branch)."""
+    """Substring-search task JSON in the registry."""
     pk = project_key or _project()
     task_dir = REGISTRY_ROOT / "tasks" / pk
     if not task_dir.exists():
@@ -144,12 +141,8 @@ def query_registry(query: str, project_key: str | None = None) -> str:
     return json.dumps({"query": query, "results": results}, indent=2)
 
 
-# Spec §4.1–4.3 tools. Real behavior requires kernel integration (soul-lock,
-# Socratic Block, COW registry). Stubs return a structured deferred response
-# so the MCP surface is spec-aligned and the kernel can fill these in later
-# without changing the tool signatures.
 _DEFERRED_NOTE = (
-    "Kernel integration (soul-lock, Socratic Block, COW registry) not yet "
+    "Truss platform integration (truss-lock, Socratic Block, COW registry) not yet "
     "implemented. This is a spec-aligned stub."
 )
 
@@ -189,7 +182,7 @@ def truss_spawn_branch(source_node_id: str, branch_intent: str) -> str:
 
 
 def main() -> None:
-    _log(f"starting Truss MCP Server; REGISTRY_ROOT={REGISTRY_ROOT}, SOUL_PROJECT={_project()}")
+    _log(f"starting Truss MCP Server; REGISTRY_ROOT={REGISTRY_ROOT}, TRUSS_PROJECT={_project()}")
     mcp.run()
 
 

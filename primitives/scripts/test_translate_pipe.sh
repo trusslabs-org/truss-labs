@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# Smoke test: prove hooks.jsonl → soul_translate → soul_query → soul_trap
-# composes end-to-end. Closes the gap that test_pipe_compose.sh flagged
-# (hooks.jsonl wrong shape for soul_query).
-#
-# Task: 310 (unblocks the artifact-3 recording).
+# Smoke test: prove hooks.jsonl → trace translate → trace analyze → trap run
+# composes end-to-end as a real Unix pipe under Truss.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_FIXTURE="$(mktemp -t hooks_fix.XXXXXX.jsonl)"
-TRAP_EVENTS="$(mktemp -t soul_trap_events.XXXXXX.jsonl)"
+TRAP_EVENTS="$(mktemp -t truss_trap_events.XXXXXX.jsonl)"
 trap 'rm -f "$HOOKS_FIXTURE" "$TRAP_EVENTS"' EXIT
 
 # Isolate trap config — don't touch the real registry.
-export SOUL_PROJECT="truss-labs-translate-test-$$"
+export TRUSS_PROJECT="truss-labs-translate-test-$$"
 
 # Fixture: native hooks.jsonl shape with a SESSION_START marker, an error,
 # and a 3x retry on the same target.
@@ -26,23 +23,23 @@ cat > "$HOOKS_FIXTURE" <<'JSONL'
 {"timestamp":"2026-05-03T10:00:05","event":"AfterTool","operation":"READ","session_id":"abc12345","cwd":"/x","tool":"Read","target":"/etc/hosts","content":"{'type': 'text'}"}
 JSONL
 
-# Configure ON_RETRY trap that halts.
-python3 "$SCRIPT_DIR/soul_trap.py" clear > /dev/null
-python3 "$SCRIPT_DIR/soul_trap.py" add --on ON_RETRY --action ACTION_HALT > /dev/null
+# Configure ON_RETRY trap that halts. Use the new CLI structure.
+python3 "$SCRIPT_DIR/truss.py" trap clear > /dev/null
+python3 "$SCRIPT_DIR/truss.py" trap add --on ON_RETRY --action ACTION_HALT > /dev/null
 
 # Pipe under test: hooks.jsonl → translate → query (filter circular) → trap.
 set +e
 cat "$HOOKS_FIXTURE" \
-  | python3 "$SCRIPT_DIR/soul_translate.py" \
-  | python3 "$SCRIPT_DIR/soul_query.py" --json --flag FLAG_CIRCULAR_REASONING \
-  | python3 "$SCRIPT_DIR/soul_trap.py" run \
+  | python3 "$SCRIPT_DIR/truss.py" trace translate \
+  | python3 "$SCRIPT_DIR/truss.py" trace analyze --json --flag FLAG_CIRCULAR_REASONING \
+  | python3 "$SCRIPT_DIR/truss.py" trap run \
   > "$TRAP_EVENTS"
 PIPE_EXIT=$?
 set -e
 
 # Cleanup.
-python3 "$SCRIPT_DIR/soul_trap.py" clear > /dev/null
-rm -rf "$HOME/truss/specs/$SOUL_PROJECT" 2>/dev/null || true
+python3 "$SCRIPT_DIR/truss.py" trap clear > /dev/null
+rm -rf "$HOME/.truss/ledger/specs/$TRUSS_PROJECT" 2>/dev/null || true
 
 # Assertions.
 if [ ! -s "$TRAP_EVENTS" ]; then

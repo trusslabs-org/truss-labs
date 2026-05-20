@@ -10,13 +10,14 @@ python primitives/mcp/truss_server.py
 ```
 
 Env vars:
-- `TRUSS_REGISTRY` — registry root (default `~/soul_registry`)
-- `SOUL_PROJECT` — active project key (default `ilteris-company`)
+- `TRUSS_REGISTRY` — registry root (default `~/.truss/ledger`)
+- `TRUSS_PROJECT` — active project key (default `truss-labs`)
 
 ## Smoke test
 
 ```bash
 python primitives/mcp/smoke_test.py
+python primitives/mcp/smoke_test_v12.py
 ```
 
 Exits 0 on success, prints a one-line diagnosis otherwise.
@@ -48,8 +49,8 @@ npx @modelcontextprotocol/inspector python primitives/mcp/truss_server.py
 
 ### Deferred (not in this prototype)
 
-- Real `truss_pause` / `truss_inject_state` — needs `soul-lock` + Socratic Block state machine.
+- Real `truss_pause` / `truss_inject_state` — needs `truss-lock` + Socratic Block state machine.
 - Real `truss_spawn_branch` — needs COW branch storage in the registry.
 - WebSocket transport (stdio only for now).
 - Subscribe/streaming on `truss://registry/active` (snapshot only).
-- Branch GC on `soul finalize`.
+- Branch GC on `truss finalize`.

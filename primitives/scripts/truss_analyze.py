@@ -56,7 +56,7 @@ def emit_pretty(results, node_index):
     if not results:
         print("No matching nodes found.")
         return
-    print(f"--- SOUL QUERY RESULTS ({len(results)} matches) ---")
+    print(f"--- TRUSS ANALYZE RESULTS ({len(results)} matches) ---")
     for r in results:
         print(f"\n[ NODE: {r['node_id']} | TYPE: {r['type']} ]")
         print(f"  Name: {r.get('name', '')}")
