@@ -76,7 +76,7 @@ truss proxy exec --policy ~/policies/phi/ -- gemini-cli</code></pre>
 					<div class="space-y-2">
 						<h3 class="text-md text-text font-mono">truss proxy stop [--port PORT]</h3>
 						<p class="text-dim text-sm leading-relaxed">
-							Surgically stops any active Truss Audit Proxy daemon bound to the target port by issuing a standard termination signal (SIGTERM) followed by a force-kill signal (SIGKILL) if the daemon remains unresponsive.
+							Stops any active Truss Audit Proxy daemon bound to the target port by issuing SIGTERM, followed by SIGKILL if the daemon remains unresponsive.
 						</p>
 						<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code>truss proxy stop --port 8000</code></pre>
 					</div>
@@ -112,7 +112,7 @@ truss proxy exec --policy ~/policies/phi/ -- gemini-cli</code></pre>
 					<div class="space-y-2">
 						<h3 class="text-md text-text font-mono">truss receipt query "SQL"</h3>
 						<p class="text-dim text-sm leading-relaxed">
-							Executes lightning-fast SQL queries against local JSON receipt records using an integrated **DuckDB** analytics engine. Use <code>receipts</code> as the virtual table name.
+							Runs SQL queries against local JSON receipt records using an integrated DuckDB analytics engine. Use <code>receipts</code> as the virtual table name.
 						</p>
 						<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code># Find all blocked prompt requests
 truss receipt query "SELECT timestamp, verdict, model FROM receipts WHERE verdict = 'blocked'"</code></pre>

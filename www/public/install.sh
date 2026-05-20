@@ -1,5 +1,5 @@
 #!/bin/bash
-# Truss Audit Substrate Installer
+# Truss Audit installer
 set -e
 
 echo "🛡️ Initializing Truss installation..."

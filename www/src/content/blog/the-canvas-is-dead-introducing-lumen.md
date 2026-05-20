@@ -1,32 +1,25 @@
 ---
-title: "The Canvas is Dead: Introducing LUMEN"
+title: "LUMEN: a relational prototype for UI generation"
 date: "2026-04-20"
-description: "A provocation on the future of design. Why we're moving from spatial canvases to relational orchestration, and a look at our new speculative prototype."
+description: "A speculative prototype I built to test whether you can describe UI by intent and relationships instead of pixel coordinates."
 ---
 
-Design is currently having its "machine code" moment. 
+LUMEN is a speculative prototype I built to test one question: can you describe a UI by intent and relationships between pieces, and let the machine handle the pixel coordinates?
 
-For the last decade, we have treated the **spatial canvas** (Figma, Sketch, Framer) as the primary drafting table for digital products. We spend our days "needle-threading"—manually adjusting X/Y coordinates, border-radiuses, and hex codes to approximate a user interface.
+The tools I use daily (Figma, Sketch, Framer) are spatial. You move things by X/Y, tweak border radius, pick hex codes. That made sense when a human had to draw every screen. Now that a model can fill in the pixels, the bottleneck is somewhere else — describing what the interface *is for*, not where each element sits.
 
-At **Truss Labs**, we believe this model is becoming a relic. As AI takes over the low-level implementation of UI, the "Canvas" is starting to feel like a spreadsheet trying to be a painting. 
+## The thesis
 
-Today, we're introducing **LUMEN**: a speculative prototype that proves the future of design isn't spatial; it's **Relational**.
+Most product design is assembly. You have a problem, you pick a solution shape, you build it from components that already exist. If you can express the requirements precisely enough, you don't need to draw the result. You curate from generated variations.
 
-## The Thesis: Curation over Creation
+Concretely:
 
-90% of modern product design is assembly. You have a business problem, you devise a solution, and you build it from a library of existing components. 
+- Old way: drag a slider to change border radius from 4px to 8px.
+- LUMEN way: tell the system "make this feel more organic," see five variations, pick one.
 
-If you have a powerful enough modality to express the *requirements* of that interface, you don't need to draw it. You just need to **curate** it.
+## How it works
 
-In the LUMEN model:
-- **Old Way**: Move a slider to change a border radius from 4px to 8px.
-- **New Way**: Tell the system, "Make this feel more organic and approachable," and pick from a gallery of variations.
-
-## How LUMEN Works: Relational Gravity
-
-LUMEN replaces coordinates with a concept we call **Relational Gravity**. 
-
-Instead of telling the machine *where* things are, you tell it the **Force** (emphasis) and the **Dialogue** (relationship) between pieces. 
+LUMEN replaces coordinates with two concepts: *emphasis* (how important is this piece) and *gravity* (how does this piece relate to that one).
 
 ```json
 {
@@ -40,30 +33,26 @@ Instead of telling the machine *where* things are, you tell it the **Force** (em
 }
 ```
 
-The engine then "projects" this intent through a **Design Language**—a set of physics rules that decides how to render that gravity into CSS. 
+The engine takes that intent and projects it through a design language — a set of rules that turns the abstract graph into CSS.
 
-## The Multi-Language Projection
+## Multi-language projection
 
-Because LUMEN decouples the **Intent** (what the user needs) from the **Surface** (how it looks), we can re-skin an entire application in milliseconds.
+Because the intent is decoupled from the rendering, I can re-skin the same screen by swapping the projection layer. In the first run I projected the same intent through three lenses:
 
-In our first run, we projected the same intent through three distinct lenses:
-1. **Brutalist**: Hard edges, heavy shadows, high impact.
-2. **Glass**: Translucency, blur, premium feel.
-3. **Minimal**: Editorial, quiet, focus on rhythm.
+1. Brutalist — hard edges, heavy shadows.
+2. Glass — translucency, blur.
+3. Minimal — editorial, lots of whitespace.
 
-The machine did 100% of the construction. The human did 1% of the intent.
+Same input graph, three different outputs.
 
-## Why this matters
+## What I'm unsure about
 
-LUMEN isn't just a design tool; it's a **Control Plane** for AI-driven development. 
+A few things I haven't figured out:
 
-By removing the "middle-man" of the canvas, we eliminate the drift between design and code. The intent *is* the code. This is a critical building block for our broader mission at Truss Labs: industrializing the infrastructure that allows humans to steer AI at high velocity.
+- Whether "gravity" is the right primitive, or whether it's just a fancy name for parent/child relationships.
+- How LUMEN handles dense interfaces (dashboards, tables) where relationships aren't really the point.
+- Whether the projection layer is just a styled component library with extra steps.
 
-The canvas isn't dead because it's bad. It's dead because it no longer serves the emerging needs of the design-to-code workflow.
+LUMEN is a sketch, not a product. I built it to see what falls out when you stop drawing and start describing. The thing I want to keep working on is the bridge between this kind of intent description and the audit/policy work in the rest of Truss Labs — there's a shared idea about structured artifacts being easier to govern than freeform output.
 
-We're just getting started with LUMEN. If you're interested in the intersection of relational orchestration and UI projection, let's talk.
-
----
-**Ilteris Kaplan**  
-Systems Architect, Truss Labs  
-Brooklyn, NY
+If you're working on something similar, I'm at ilteris@trusslabs.org.
