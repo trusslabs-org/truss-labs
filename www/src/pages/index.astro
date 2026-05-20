@@ -3,77 +3,50 @@ import Layout from '../layouts/Layout.astro';
 import 'asciinema-player/dist/bundle/asciinema-player.css';
 ---
 
-<Layout title="Home" description="AI activity visibility on infrastructure you control">
-	<section class="space-y-16">
-		<div class="prose prose-invert max-w-none">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">What I'm building</h2>
-			<p class="text-xl leading-relaxed">
-				See what AI is doing with your sensitive data — on infrastructure you control.
+<Layout title="Truss Labs">
+	<main class="max-w-3xl mx-auto px-6 py-20 font-sans text-white leading-relaxed antialiased selection:bg-accent selection:text-black">
+		<header class="mb-16">
+			<h1 class="text-xl tracking-tight mb-2 select-none font-sans font-medium">Truss Labs</h1>
+			<p class="text-dim text-sm tracking-tight select-none">AI activity visibility on infrastructure you control.</p>
+		</header>
+
+		<div class="mb-16 text-sm">
+			<p class="mb-4 text-dim">
+				Truss is a lightweight audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a hash-verifiable JSON receipt is written to disk.
 			</p>
-			<p class="text-dim leading-relaxed">
-				Truss is the visibility and control layer between AI agents and the systems that hold sensitive data. It captures every prompt, every response, and every action an agent takes, into a durable on-disk ledger your auditors and counsel can read directly. No vendor portal. No opaque chat history. The runtime is software you run yourself — physical box, VM, container, or your own cloud account. There is no Truss-operated cloud in the data path, ever.
-			</p>
-			<p class="text-dim leading-relaxed">
-				It extends the EDR/DLP stack you already run (CrowdStrike, Varonis, Proofpoint) into the prompt-and-response layer those tools structurally cannot see.
-			</p>
-			<p class="text-dim text-sm leading-relaxed pt-2">
-				Live demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a> — an audit proxy in front of Gemini, with three policy verdicts (block / redact / allow) and a 7-day retention timer. Zero inbound ports on the host.
+			<p class="text-dim">
+				The pitch: DLP-style visibility for AI activity on sensitive data, on infrastructure you control. No SaaS dependency; no third-party trust.
 			</p>
 		</div>
 
-		<div class="pt-4">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Two products, one architecture</h2>
-			<div class="grid md:grid-cols-2 gap-8">
-				<div class="space-y-3">
-					<h3 class="text-text">Truss Audit — for CISOs</h3>
-					<p class="text-dim text-sm leading-relaxed">
-						Captures prompts, responses, sensitive-data class hits, downstream actions, and policy verdicts into audit-defensible receipts on customer-controlled infrastructure. Receipts are JSON files you can grep, query with SQLite, and retain on your own schedule. Designed to answer the questions a board, a county counsel, or a cyber-insurance questionnaire actually asks.
-					</p>
+		<div class="mb-16">
+			<div class="relative w-full rounded border border-white/10 bg-black/40 overflow-hidden shadow-2xl mb-6">
+				<div class="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+					<div class="flex gap-1.5">
+						<span class="w-3 h-3 rounded-full bg-white/10"></span>
+						<span class="w-3 h-3 rounded-full bg-white/10"></span>
+						<span class="w-3 h-3 rounded-full bg-white/10"></span>
+					</div>
+					<span class="text-xs text-dim font-mono select-none mx-auto pr-6">demo.trusslabs.org</span>
 				</div>
-				<div class="space-y-3">
-					<h3 class="text-text">Truss CLI — for builders</h3>
-					<p class="text-dim text-sm leading-relaxed">
-						The broader harness for shaping and auditing agent behavior. Same architecture (customer-controlled runtime, on-disk state, no vendor cloud in the data path), plus steering primitives for shaping live agent reasoning through Unix-style pipes.
-					</p>
-				</div>
+				<div class="aspect-[117/30] w-full p-4 font-mono bg-[#121314]" id="asciinema-demo"></div>
+			</div>
+			<div class="flex justify-between items-center px-1">
+				<span class="text-dim text-xs select-none">Recorded 2026-05-18 (53.5s take).</span>
+				<a href="/demo/truss-exec-wrap.mp4" download class="text-dim text-xs underline hover:text-white transition-colors">Download MP4 (9.4 MB)</a>
 			</div>
 		</div>
 
-		<div class="pt-4">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Six months of dogfooding, on this laptop</h2>
-			<p class="text-dim leading-relaxed">
-				Truss Audit is not a hypothesis. It is the productized version of a tool I have been running for myself, on my own laptop, for the past six months.
-			</p>
-			<p class="text-dim leading-relaxed pt-3">
-				I run a local registry at <code>~/.truss/ledger/</code>. No external SaaS in the data path. Files I own, formats I control, queryable with <code>grep</code>, <code>jq</code>, and <code>truss</code> against the directory directly. Sessions distilled at close into an immutable record. Decisions logged to a ledger. Tasks tracked as JSON files I version-control.
-			</p>
-			<p class="text-dim leading-relaxed pt-3">
-				The architecture maps almost line-for-line onto what Truss Audit ships: task state becomes AI activity in <code>~/.truss/ledger/receipts/</code>; the session ledger becomes the receipt stream; the gates I wrote to keep agents from breaking my workflow become the policy YAML. Same shape — one for me, one for the customer.
-			</p>
-			<p class="text-dim text-sm leading-relaxed pt-3">
-				A CISO can ask <em>"do you actually run this?"</em> and the honest answer is: yes, daily, for six months, on this machine.
-			</p>
-		</div>
-
-		<div class="pt-4">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Show me</h2>
-			<p class="text-dim leading-relaxed mb-6">
-				One command wraps any agent CLI in a local audit proxy. Every prompt and response flows through a policy chain — classify, evaluate, optionally block or redact — and writes a hash-verifiable JSON receipt to disk. The model never sees what your policy doesn't let it see.
-			</p>
-
-			<div id="asciinema-demo" class="mt-8 mb-2 rounded border border-white/10 overflow-hidden"></div>
-			<p class="text-dim text-xs leading-relaxed mb-8 text-right">
-				<a href="/demo/truss-exec-wrap.mp4" download class="hover:text-accent">↓ download mp4 (1.2 MB)</a>
-			</p>
-
-			<p class="text-dim text-sm leading-relaxed pb-3">
-				Wrap your agent CLI:
+		<div class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Show me: process-level wrap</h2>
+			<p class="text-dim text-sm leading-relaxed mb-4">
+				You don't need to rebuild your agents or modify their codebase. Truss wraps existing tools (like <code>gemini-cli</code>, in-house python pipelines, Cursor, or SDK-based agents) by pointing their client base-URLs at a local uvicorn proxy on your machine.
 			</p>
 			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Install (bootstraps a private venv + ledger under ~/.truss/)
 curl -sSL https://trusslabs.org/install.sh | bash
 
 # Wrap gemini-cli (works the same for `claude` — sets ANTHROPIC_BASE_URL)
-truss exec -- gemini-cli
+truss proxy exec -- gemini-cli
 
 # Inside the wrapped CLI, ask something that contains a patient address:
 #   → Patient lives at 1234 Main St. Summarize their case.
@@ -81,7 +54,7 @@ truss exec -- gemini-cli
 ls ~/.truss/ledger/receipts/$(date -u +%F)/
 
 # An auditor can verify every receipt in the ledger:
-truss verify ~/.truss/ledger/receipts</code></pre>
+truss receipt verify ~/.truss/ledger/receipts</code></pre>
 
 			<p class="text-dim text-sm leading-relaxed pt-4">
 				Provider-agnostic by design — Gemini and Claude both wired today; OpenAI is the same reverse-proxy shape. Truss holds no upstream model credentials. The wrapped CLI's own API key (or OAuth token) flows through the inbound request and truss forwards it.
@@ -91,12 +64,12 @@ truss verify ~/.truss/ledger/receipts</code></pre>
 			</p>
 		</div>
 
-		<div class="pt-4">
+		<div class="pt-4 mb-16">
 			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Also: offline trace analysis</h2>
 			<p class="text-dim text-sm leading-relaxed">
-				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss translate</code> turns hooks.jsonl into traceable nodes, <code>truss analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
+				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss trace translate</code> turns hooks.jsonl into traceable nodes, <code>truss trace analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
 			</p>
-			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss translate | truss analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
+			<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
 		</div>
 
 		<div class="pt-4">
@@ -109,39 +82,21 @@ truss verify ~/.truss/ledger/receipts</code></pre>
 			import * as AsciinemaPlayer from 'asciinema-player';
 			const target = document.getElementById('asciinema-demo');
 			if (target) {
-				AsciinemaPlayer.create('/demo/truss-exec-wrap.cast', target, {
-					autoPlay: true,
-					loop: true,
-					speed: 0.7,
-					theme: 'asciinema',
-					fit: 'width',
-					controls: true,
-				});
+				AsciinemaPlayer.create(
+					'/demo/truss-exec-wrap.cast',
+					target,
+					{
+						cols: 117,
+						rows: 30,
+						autoPlay: true,
+						loop: true,
+						preload: true,
+						terminalFontSize: '12px',
+						terminalFontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
+						theme: 'asciinema'
+					}
+				);
 			}
 		</script>
-
-		<div class="pt-12 border-t border-white/5">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Writing</h2>
-			<div class="space-y-8">
-				<article class="group">
-					<a href="/blog/block-and-redact-are-not-the-same" class="block space-y-2 hover:no-underline">
-						<time class="text-xs text-dim uppercase tracking-widest">May 19, 2026</time>
-						<h3 class="text-lg group-hover:text-accent transition-colors">Block and redact are not the same thing</h3>
-						<p class="text-dim text-sm line-clamp-2">
-							Truss ships two policy verdicts that look interchangeable on first read. They aren't. They cover different threats, and the difference shows up in the receipt.
-						</p>
-					</a>
-				</article>
-				<article class="group">
-					<a href="/blog/the-birth-of-truss-labs" class="block space-y-2 hover:no-underline">
-						<time class="text-xs text-dim uppercase tracking-widest">April 17, 2026</time>
-						<h3 class="text-lg group-hover:text-accent transition-colors">Why I started Truss Labs</h3>
-						<p class="text-dim text-sm line-clamp-2">
-							Notes on incorporating in New York, picking a C-Corp, and why I'm working on agent infrastructure instead of another agent product.
-						</p>
-					</a>
-				</article>
-			</div>
-		</div>
-	</section>
+	</main>
 </Layout>

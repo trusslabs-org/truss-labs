@@ -1,7 +1,7 @@
 ---
-title: "Why I started Truss Labs"
-date: "2026-04-17"
+title: "The birth of Truss Labs"
 description: "Notes on incorporating, picking a C-Corp, and why I'm working on the infrastructure under agents instead of another agent product."
+date: "2026-04-17"
 ---
 
 Yesterday I filed the paperwork for **Truss Labs Inc.** in New York. This is a note on what I'm actually working on and why I structured it this way, written mostly for myself and anyone following along.
@@ -33,7 +33,7 @@ Honestly, not much that's public yet. What exists internally:
 
 1. **Truss Kernel** — a local shell harness that keeps agent state (sessions, tasks, traces) on disk in a format I can query with ordinary tools. Not a framework; more like a filesystem convention plus a few CLIs.
 2. **TWP (Truss Wire Protocol)** — a thin layer on top of Anthropic's [Model Context Protocol](https://modelcontextprotocol.io/) that adds branching and checkpointing. This is the piece I'm least sure about and most likely to rewrite.
-3. **Primitives** — `truss analyze`, `truss trap`, `truss ingest`. Small CLI tools. `truss trap` halts a run when confidence drops below a threshold; `truss analyze` reads traces; `truss ingest` loads context.
+3. **Primitives** — `truss trace analyze`, `truss trap`, `truss ingest`. Small CLI tools. `truss trap` halts a run when confidence drops below a threshold; `truss trace analyze` reads traces; `truss ingest` loads context.
 
 The Trace-Tree UI — a way to see a run as a tree you can branch and inspect — is sketched but not built.
 

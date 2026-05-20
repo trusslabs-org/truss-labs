@@ -1,22 +1,21 @@
 ---
 title: "Block and redact are not the same thing"
-date: "2026-05-19"
-description: "Truss ships two policy verdicts that look interchangeable on first read. They aren't. They cover different threats, and the difference shows up in the receipt."
+description: "Most LLM security tools conflate blocking and redacting. In a multi-turn agent session, confusing the two breaks both model reasoning and the legal audit trail."
+date: "2026-05-15"
 ---
 
-The first question every security person asks when they look at Truss is some version of: *if both block and redact stop sensitive data from leaking, why do you have two verdicts?*
+Most security products that sit in front of AI models have one big button: *redact*. 
 
-It's a fair question. Both stop something. Both write a receipt. The naming makes them sound like dial positions on the same control.
+If they see a Social Security number, a credit card, or a date of birth, they replace it with `[REDACTED_SSN]` or some other neutral placeholder in the prompt, send it to the model, and hope the model doesn't notice.
 
-They're not. They cover different threats, and the difference is load-bearing. I've explained it across a dozen calls now, so this is the version I'd want a security IC to read before our call instead of during it.
+If you are building a simple search box, that works. If you are building a multi-turn agent, **it breaks everything.** 
 
-## The two verdicts, plainly
+Here's why blocking and redacting are structurally different, and why confusing the two ruins both model reasoning and the legal audit trail.
 
-A policy in Truss matches a *direction* (`prompt` or `response`) and produces a *verdict* (`allow`, `block`, or `redact`).
+## The mechanical difference
 
-- **Block** stops the request. The model never sees the prompt. Truss synthesizes a refusal that goes back to the user, writes a receipt with `verdict: blocked`, and the upstream LLM API is never called.
-
-- **Redact** lets the request through. The model produces a response. Truss inspects that response, finds the sensitive span, rewrites it in place to `[redacted]` (or whatever marker the policy specifies), and returns the rewritten response to the user. The receipt records the redaction with `before_hash` and `after_hash` — proof a redaction happened, without storing the original text in the receipt body.
+*   **Block** is binary. The call is aborted before it reaches the model. The model receives nothing; the user gets a local refusal.
+*   **Redact** is inline. The data is altered before it's displayed or sent. The model operates on one version, while a downstream human or log gets a different version.
 
 That's the mechanical difference. But the interesting question is *what each one is for*, and that's where the naming intuition fails.
 
@@ -34,7 +33,7 @@ The model is not the threat target in the redact case. It's an ephemeral process
 
 ## The walk-through
 
-Imagine three turns in a single session against `gemini-cli` wrapped with `truss exec`.
+Imagine three turns in a single session against `gemini-cli` wrapped with `truss proxy exec`.
 
 ```
 > Patient lives at 1234 Main St. Summarize the case note.
@@ -49,76 +48,62 @@ Blocked per HIPAA review. Contact compliance to request an exception.
 
 A receipt is written with `verdict: blocked` and `matched_classes: ["phi:patient_address"]`. The full original prompt text is in the receipt, on disk you control, behind your retention policy — because the auditor still needs to see what was attempted. The model just never saw it.
 
-```
-> Write one line exactly like this: "DOB: 03/14/1972, condition: hypertension"
-```
-
-`phi:patient_dob` doesn't match anywhere in the prompt direction (there's no block policy on DOB in the prompt). Truss forwards the prompt to Gemini. Gemini writes the line. Truss inspects the response, matches `phi:patient_dob`, and the response policy says **redact**. The user sees:
+Now, a separate turn:
 
 ```
-[redacted], condition: hypertension
+> Patient has a DOB of 04/12/1978. Please write their summary.
 ```
 
-The receipt records `verdict: redacted` and `redactions_applied: [{location: "response", before_hash: "sha256:...", after_hash: "sha256:..."}]`. The before/after hashes prove a redaction happened at a specific location. Neither the original DOB nor the redacted version is meaningful PII in isolation — only the hash chain is, and that's structured for audit.
+The prompt doesn't match the address block. The prompt flows upstream. Gemini processes it, reasons over it, and returns:
 
 ```
-> What date did you mention?
+SUMMARY: Patient is a 48-year-old male born April 12, 1978.
 ```
 
-The model answers `03/14/1972`. Because — and this is the part that surprises people — the model has its original response in conversation history. It sees `DOB: 03/14/1972, condition: hypertension` as the thing it said last turn, even though the user saw `[redacted]`. Truss keeps two views: one for the user, one for the model. The user gets the redacted form for screen safety. The model gets its real prior context so the conversation doesn't break down with the model going *"wait, did I get redacted? let me investigate what filter is active here"* on every follow-up.
+Truss intercepts the *response*. `phi:patient_dob` matches. The policy says **redact** in the response direction. Truss rewrites the response text:
 
-What does that mean? Just that, of course, the next response also matches `phi:patient_dob` and gets redacted again. The user sees `[redacted]`. The receipt records another `verdict: redacted` event. The same hash chain pattern.
-
-That's the point: redact isn't a one-time scrub. It's deterministic per-response enforcement. Even if the model would happily emit the DOB ten times across ten turns, the user sees `[redacted]` ten times and the audit log has ten receipts proving it.
-
-## Why this isn't "redact is a worse block"
-
-The intuition I hear most often is: *"if redact still lets the model see the data, it's just a weaker block. Why not block everything?"*
-
-Because for the cases redact is for, blocking would break the work.
-
-If you block every chart note that contains a DOB from reaching the model, the clinician can't get a summary of any chart note. The model needs the DOB to do its job. What you don't want is the DOB *echoed back* into a chat window. Redact does that, and only that.
-
-Block and redact aren't a single dial. They're two filters at different points in the request lifecycle, addressing different threats. A real policy set uses both — block on the data classes that shouldn't cross the API boundary at all, redact on the classes that the model needs to operate on but shouldn't surface to humans.
-
-## What this looks like in receipts
-
-The receipt schema makes the distinction explicit:
-
-```jsonc
-{
-  "policy_decisions": [{
-    "verdict": "blocked",                   // or "redacted" or "allowed"
-    "matched_classes": ["phi:patient_address"],
-    "policy_id": "phi_block_address_in_external_prompt",
-    "redactions_applied": []                // empty on block
-  }]
-}
+```
+SUMMARY: Patient is a 48-year-old male born [REDACTED_DOB].
 ```
 
-versus
+This is what the user sees in their terminal or chat window. The DOB was processed by the model, but it is not exfiltrated onto the human-visible screen.
 
-```jsonc
-{
-  "policy_decisions": [{
-    "verdict": "redacted",
-    "matched_classes": ["phi:patient_dob"],
-    "policy_id": "phi_redact_dob_in_response",
-    "redactions_applied": [{
-      "location": "response",
-      "before_hash": "sha256:1a35...",
-      "after_hash": "sha256:017a..."
-    }]
-  }]
-}
+## The multi-turn swap problem
+
+This is where standard redaction proxies break. 
+
+On the very next turn, the user's CLI (or SDK) sends the *entire session history* back to the model, including the model's own prior response:
+
+```
+> Yes, and does that born [REDACTED_DOB] match the intake chart?
 ```
 
-An auditor who pulls these two receipts knows immediately which boundary was protected and how. Blocks have empty `redactions_applied`; redacts have one or more entries with the hash pair. The verdict is structured, not free-text.
+If you send that literal text back to Gemini, **Gemini's reasoning breaks.** It looks at `born [REDACTED_DOB]` and has no idea what DOB the user is talking about, even though it originally wrote it. The model gets confused, starts hallucinating, or asks the user to re-provide the date.
 
-## The short version
+To solve this, Truss runs a stateful **swap table**. 
 
-> **Block** = "shouldn't have crossed the boundary." Model never sees it. Receipt records the attempt. Use when the data class is one your contract or regulation says can't leave your trust zone.
->
-> **Redact** = "model can know this, humans downstream shouldn't see it." Model operates on the data normally; the response is rewritten in place before it surfaces to the chat. Receipt records hash-chain proof. Use when the data class is necessary context but not safe to echo back.
+Every time Truss redacts a response, it stores a temporary local hash of the redacted value pointing to the original:
 
-If someone reads only that paragraph and walks away, they have the model. Everything else is the implementation.
+`sha256:5ef2...09e` → `April 12, 1978`
+
+On the next turn, before forwarding the prompt history to the provider, Truss walks the prior assistant turns in the request body and swaps the original value *back* into the prompt. 
+
+The upstream model sees an unbroken, coherent view of its own outputs:
+
+```
+> Yes, and does that born April 12, 1978 match the intake chart?
+```
+
+While the user's local terminal and logs remain completely clean:
+
+```
+> Yes, and does that born [REDACTED_DOB] match the intake chart?
+```
+
+## Alignment over mechanics
+
+This is why Truss is a separate governance substrate and not just a regex filter in your SDK. 
+
+To govern agents, the proxy must understand the protocol (Gemini/Claude API structures) and hold state across turns to protect the model's reasoning while guaranteeing the security boundary.
+
+When you conflate blocking and redacting, you either leak data to the model's server unnecessarily, or you break the agent's ability to reason over long sessions. You need to do both, and you need to know exactly which one you are doing.
