@@ -196,7 +196,7 @@ truss trap add --on ON_RETRY --action ACTION_HALT</code></pre>
 				<p class="text-dim text-sm leading-relaxed">
 					To register the server, point your MCP client configuration to execute our server script:
 				</p>
-				<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code># Register with Claude Desktop or Cursor
+				<pre class="bg-black/40 border border-white/10 rounded p-4 overflow-x-auto text-xs"><code>{`# Register with Claude Desktop or Cursor
 {
   "mcpServers": {
     "truss-labs": {
@@ -204,7 +204,7 @@ truss trap add --on ON_RETRY --action ACTION_HALT</code></pre>
       "args": ["/absolute/path/to/truss-labs/primitives/mcp/truss_server.py"]
     }
   }
-}</code></pre>
+}`}</code></pre>
 				<p class="text-dim text-sm leading-relaxed">
 					Once connected, your client has access to direct registry query tools and trace resource templates (e.g. <code>truss://registry/active</code>).
 				</p>
