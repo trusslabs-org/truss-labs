@@ -5,10 +5,11 @@ interface Props {
 }
 
 const { title, description = "AI activity visibility on infrastructure you control" } = Astro.props;
+const isDocs = Astro.url.pathname.startsWith('/docs');
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme={isDocs ? 'paper' : 'dark'}>
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />

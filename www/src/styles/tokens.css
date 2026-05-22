@@ -1,9 +1,27 @@
 /* tokens.css — Truss design system v1, ref + sys layers
- * Spec: docs/research/DESIGN_SYSTEM_v1.md §3
+ * Site = Obsidian Dark (default). Docs = Paper-Light (data-theme="paper").
  */
 
 :root {
-  /* Default: Premium Alabaster Paper-Light Mode */
+  /* Default: Obsidian Dark */
+  --sys-color-bg:                 #0a0a0a;
+  --sys-color-surface:            #141414;
+  --sys-color-surface-variant:    #1c1c1c;
+  --sys-color-text:               #e0e0e0;
+  --sys-color-text-dim:           #888888;
+  --sys-color-accent:             #ff9966; /* Peach Coral */
+  --sys-color-border:             rgba(255, 255, 255, 0.1);
+
+  --sys-color-status-ok:          #4ade80;
+  --sys-color-status-warn:        #fbbf24;
+  --sys-color-status-err:         #ef4444;
+
+  /* typography */
+  --sys-font-mono:                "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Paper-Light override — opt-in per route via <html data-theme="paper"> */
+:root[data-theme="paper"] {
   --sys-color-bg:                 #fbfaf8;
   --sys-color-surface:            #f3f2ee;
   --sys-color-surface-variant:    #ebeae6;
@@ -11,31 +29,10 @@
   --sys-color-text-dim:           #646462;
   --sys-color-accent:             #c14d03; /* Rust / Terracotta */
   --sys-color-border:             rgba(0, 0, 0, 0.08);
-  
-  /* status colors */
+
   --sys-color-status-ok:          #15803d;
   --sys-color-status-warn:        #b45309;
   --sys-color-status-err:         #b91c1c;
-
-  /* typography */
-  --sys-font-mono:                "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Obsidian Dark Mode Override */
-    --sys-color-bg:                 #0a0a0a;
-    --sys-color-surface:            #141414;
-    --sys-color-surface-variant:    #1c1c1c;
-    --sys-color-text:               #e0e0e0;
-    --sys-color-text-dim:           #888888;
-    --sys-color-accent:             #ff9966; /* Peach Coral */
-    --sys-color-border:             rgba(255, 255, 255, 0.1);
-    
-    --sys-color-status-ok:          #4ade80;
-    --sys-color-status-warn:        #fbbf24;
-    --sys-color-status-err:         #ef4444;
-  }
 }
 
 /* Tailwind 4 theme bridge — exposes sys tokens as utility namespaces
