@@ -1,4 +1,4 @@
-"""Surface adapters — API-shape-specific glue for Gemini + Anthropic.
+"""Surface adapters — API-shape-specific glue for Gemini + Anthropic + ChatGPT.
 
 Each adapter knows how to:
   - extract the latest user prompt text + the assistant response text
@@ -313,6 +313,427 @@ class AnthropicSurface:
                     text = ""
                 if text and _hash_text(text) in drop_hashes:
                     if new_messages and isinstance(new_messages[-1], dict) and new_messages[-1].get("role") == "user":
+                        new_messages.pop()
+                    dropped += 1
+                    continue
+            new_messages.append(msg)
+        if dropped:
+            body = dict(body)
+            body["messages"] = new_messages
+        return body, dropped
+
+
+# ---------------------------------------------------------------------------
+# ChatGPT / OpenAI Chat Completions (api.openai.com/v1/chat/completions)
+# ---------------------------------------------------------------------------
+
+
+class ChatGPTSurface:
+    name = "chatgpt"
+
+    @staticmethod
+    def extract_prompt_text(body: Dict[str, Any]) -> str:
+        """Extract prompt text: system message(s) + the LAST user message."""
+        chunks: List[str] = []
+        for msg in body.get("messages", []) or []:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "system" and isinstance(content, str):
+                chunks.append(content)
+        for msg in reversed(body.get("messages", []) or []):
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "user" and isinstance(content, str):
+                chunks.append(content)
+                break
+        return "\n\n".join(chunks).strip()
+
+    @staticmethod
+    def extract_response_text(payload: Dict[str, Any]) -> str:
+        """Extract response text from first choice."""
+        chunks: List[str] = []
+        for choice in payload.get("choices", []) or []:
+            if not isinstance(choice, dict):
+                continue
+            msg = choice.get("message")
+            if isinstance(msg, dict):
+                content = msg.get("content")
+                if content:
+                    chunks.append(content)
+        return "\n\n".join(chunks)
+
+    @staticmethod
+    def redact_response(payload: Dict[str, Any], new_text: str) -> Dict[str, Any]:
+        """Redact response in-place on the first choice."""
+        out = dict(payload)
+        choices = list(payload.get("choices", []) or [])
+        if not choices:
+            out["choices"] = [{
+                "message": {"role": "assistant", "content": new_text},
+                "finish_reason": "stop", "index": 0,
+            }]
+            return out
+        first = dict(choices[0])
+        msg = dict(first.get("message", {}))
+        msg["content"] = new_text
+        first["message"] = msg
+        choices[0] = first
+        out["choices"] = choices
+        return out
+
+    @staticmethod
+    def assistant_message_iter(body: Dict[str, Any]) -> Iterator[Tuple[Dict[str, Any], str]]:
+        for msg in body.get("messages", []) or []:
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            content = msg.get("content")
+            if isinstance(content, str):
+                yield msg, content
+
+    @staticmethod
+    def replace_assistant_message_text(msg: Dict[str, Any], new_text: str) -> None:
+        msg["content"] = new_text
+
+    @staticmethod
+    def build_block_payload(model: str, message: str) -> Dict[str, Any]:
+        return {
+            "id": f"chatcmpl-truss-block-{int(time.time() * 1000)}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": message},
+                "finish_reason": "content_filter"
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }
+
+    @staticmethod
+    def strip_block_exchanges(body: Dict[str, Any], drop_hashes: Set[str]) -> Tuple[Dict[str, Any], int]:
+        messages = body.get("messages", []) or []
+        new_messages: List[Dict[str, Any]] = []
+        dropped = 0
+        for msg in messages:
+            if not isinstance(msg, dict):
+                new_messages.append(msg)
+                continue
+            if msg.get("role") == "assistant":
+                content = msg.get("content")
+                if isinstance(content, str) and content and _hash_text(content) in drop_hashes:
+                    if new_messages and isinstance(new_messages[-1], dict) and new_messages[-1].get("role") == "user":
+                        new_messages.pop()
+                    dropped += 1
+                    continue
+            new_messages.append(msg)
+        if dropped:
+            body = dict(body)
+            body["messages"] = new_messages
+        return body, dropped
+
+
+# ---------------------------------------------------------------------------
+# ChatGPT Web UI /backend-api/conversation shape
+# ---------------------------------------------------------------------------
+
+
+class ChatGPTWebSurface:
+    name = "chatgpt_web"
+
+    @staticmethod
+    def extract_prompt_text(body: Dict[str, Any]) -> str:
+        """Extract prompt text from ChatGPT Web /backend-api/conversation."""
+        chunks: List[str] = []
+        for msg in body.get("messages", []) or []:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("author", {}).get("role")
+            content = msg.get("content", {})
+            if role == "system" and isinstance(content, dict):
+                parts = content.get("parts", []) or []
+                for p in parts:
+                    if isinstance(p, str) and p:
+                        chunks.append(p)
+        for msg in reversed(body.get("messages", []) or []):
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("author", {}).get("role")
+            content = msg.get("content", {})
+            if role == "user" and isinstance(content, dict):
+                parts = content.get("parts", []) or []
+                for p in parts:
+                    if isinstance(p, str) and p:
+                        chunks.append(p)
+                break
+        return "\n\n".join(chunks).strip()
+
+    @staticmethod
+    def extract_response_text(payload: Dict[str, Any]) -> str:
+        """Extract response text from ChatGPT Web response payload."""
+        message = payload.get("message", {}) or {}
+        content = message.get("content", {}) or {}
+        parts = content.get("parts", []) or []
+        chunks: List[str] = []
+        for p in parts:
+            if isinstance(p, str) and p:
+                chunks.append(p)
+        return "\n\n".join(chunks)
+
+    @staticmethod
+    def redact_response(payload: Dict[str, Any], new_text: str) -> Dict[str, Any]:
+        """Redact response in-place on ChatGPT Web payload."""
+        out = dict(payload)
+        msg = dict(payload.get("message", {}) or {})
+        content = dict(msg.get("content", {}) or {})
+        content["parts"] = [new_text]
+        msg["content"] = content
+        out["message"] = msg
+        return out
+
+    @staticmethod
+    def assistant_message_iter(body: Dict[str, Any]) -> Iterator[Tuple[Dict[str, Any], str]]:
+        for msg in body.get("messages", []) or []:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("author", {}).get("role")
+            if role != "assistant":
+                continue
+            content = msg.get("content", {}) or {}
+            parts = content.get("parts", []) or []
+            text_parts: List[str] = []
+            for p in parts:
+                if isinstance(p, str) and p:
+                    text_parts.append(p)
+            yield msg, "\n\n".join(text_parts)
+
+    @staticmethod
+    def replace_assistant_message_text(msg: Dict[str, Any], new_text: str) -> None:
+        content = msg.get("content") or {}
+        content["parts"] = [new_text]
+        msg["content"] = content
+
+    @staticmethod
+    def build_block_payload(model: str, message: str) -> Dict[str, Any]:
+        return {
+            "message": {
+                "id": "msg-truss-block",
+                "author": {"role": "assistant"},
+                "content": {"content_type": "text", "parts": [message]},
+                "status": "finished"
+            }
+        }
+
+    @staticmethod
+    def strip_block_exchanges(body: Dict[str, Any], drop_hashes: Set[str]) -> Tuple[Dict[str, Any], int]:
+        messages = body.get("messages", []) or []
+        new_messages: List[Dict[str, Any]] = []
+        dropped = 0
+        for msg in messages:
+            if not isinstance(msg, dict):
+                new_messages.append(msg)
+                continue
+            role = msg.get("author", {}).get("role")
+            if role == "assistant":
+                content = msg.get("content", {}) or {}
+                parts = content.get("parts", []) or []
+                text = "\n\n".join([p for p in parts if isinstance(p, str)])
+                if text and _hash_text(text) in drop_hashes:
+                    if new_messages and isinstance(new_messages[-1], dict) and new_messages[-1].get("author", {}).get("role") == "user":
+                        new_messages.pop()
+                    dropped += 1
+                    continue
+            new_messages.append(msg)
+        if dropped:
+            body = dict(body)
+            body["messages"] = new_messages
+        return body, dropped
+
+
+# ---------------------------------------------------------------------------
+# Claude Web UI /api/ organizations/.../chat_conversations/.../completion shape
+# ---------------------------------------------------------------------------
+
+
+class ClaudeWebSurface:
+    name = "claude_web"
+
+    @staticmethod
+    @staticmethod
+    def extract_prompt_text(body: Dict[str, Any]) -> str:
+        """Extract prompt text from Claude Web request payload."""
+        chunks: List[str] = []
+        
+        # 1. Try to extract from top-level prompt or text keys (typical for Claude Web completions)
+        for key in ["prompt", "text", "content"]:
+            val = body.get(key)
+            if isinstance(val, str) and val.strip():
+                chunks.append(val.strip())
+                break
+            elif isinstance(val, list):
+                for block in val:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        t = block.get("text")
+                        if t: chunks.append(t)
+                    elif isinstance(block, str):
+                        chunks.append(block)
+                if chunks:
+                    break
+        
+        # 2. Fall back to messages array if top-level extraction didn't yield anything
+        if not chunks:
+            for msg in reversed(body.get("messages", []) or []):
+                if not isinstance(msg, dict):
+                    continue
+                role = msg.get("role") or msg.get("sender")
+                if role in ("user", "human"):
+                    content = msg.get("content") or msg.get("text")
+                    if isinstance(content, str):
+                        chunks.append(content)
+                    elif isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                t = block.get("text")
+                                if t:
+                                    chunks.append(t)
+                            elif isinstance(block, str):
+                                chunks.append(block)
+                    break
+                    
+        return "\n\n".join(chunks).strip()
+    def extract_response_text(payload: Dict[str, Any]) -> str:
+        """Extract response text from Claude Web response payload."""
+        completion = payload.get("completion")
+        if isinstance(completion, str):
+            return completion
+        content = payload.get("content")
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            chunks: List[str] = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    t = block.get("text")
+                    if t:
+                        chunks.append(t)
+            return "\n\n".join(chunks)
+        return ""
+
+    @staticmethod
+    def redact_response(payload: Dict[str, Any], new_text: str) -> Dict[str, Any]:
+        """Redact response in-place on Claude Web payload."""
+        out = dict(payload)
+        if "completion" in payload:
+            out["completion"] = new_text
+            return out
+        content = payload.get("content")
+        if isinstance(content, str):
+            out["content"] = new_text
+        elif isinstance(content, list):
+            new_content: List[Dict[str, Any]] = []
+            replaced = False
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    if not replaced:
+                        new_content.append({"type": "text", "text": new_text})
+                        replaced = True
+                else:
+                    new_content.append(block)
+            if not replaced:
+                new_content.insert(0, {"type": "text", "text": new_text})
+            out["content"] = new_content
+        else:
+            out["content"] = new_text
+        return out
+
+    @staticmethod
+    def assistant_message_iter(body: Dict[str, Any]) -> Iterator[Tuple[Dict[str, Any], str]]:
+        for msg in body.get("messages", []) or []:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role") or msg.get("sender")
+            if role not in ("assistant", "model"):
+                continue
+            content = msg.get("content") or msg.get("text")
+            if isinstance(content, str):
+                yield msg, content
+            elif isinstance(content, list):
+                text_parts: List[str] = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        t = block.get("text")
+                        if t:
+                            text_parts.append(t)
+                yield msg, "\n\n".join(text_parts)
+
+    @staticmethod
+    def replace_assistant_message_text(msg: Dict[str, Any], new_text: str) -> None:
+        if "content" in msg:
+            content = msg["content"]
+            if isinstance(content, str):
+                msg["content"] = new_text
+            elif isinstance(content, list):
+                new_content: List[Dict[str, Any]] = []
+                replaced = False
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        if not replaced:
+                            new_content.append({"type": "text", "text": new_text})
+                            replaced = True
+                    else:
+                        new_content.append(block)
+                if not replaced:
+                    new_content.insert(0, {"type": "text", "text": new_text})
+                msg["content"] = new_content
+            else:
+                msg["content"] = new_text
+        elif "text" in msg:
+            msg["text"] = new_text
+        else:
+            msg["text"] = new_text
+
+    @staticmethod
+    def build_block_payload(model: str, message: str) -> Dict[str, Any]:
+        return {
+            "id": f"msg_truss_block_{int(time.time() * 1000)}",
+            "type": "message",
+            "role": "assistant",
+            "model": model,
+            "content": [{"type": "text", "text": message}],
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        }
+
+    @staticmethod
+    def strip_block_exchanges(body: Dict[str, Any], drop_hashes: Set[str]) -> Tuple[Dict[str, Any], int]:
+        messages = body.get("messages", []) or []
+        new_messages: List[Dict[str, Any]] = []
+        dropped = 0
+        for msg in messages:
+            if not isinstance(msg, dict):
+                new_messages.append(msg)
+                continue
+            role = msg.get("role") or msg.get("sender")
+            if role in ("assistant", "model"):
+                content = msg.get("content") or msg.get("text")
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    text_parts: List[str] = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            t = block.get("text")
+                            if t:
+                                text_parts.append(t)
+                    text = "\n\n".join(text_parts)
+                else:
+                    text = ""
+                if text and _hash_text(text) in drop_hashes:
+                    if new_messages and isinstance(new_messages[-1], dict) and new_messages[-1].get("role", new_messages[-1].get("sender")) in ("user", "human"):
                         new_messages.pop()
                     dropped += 1
                     continue

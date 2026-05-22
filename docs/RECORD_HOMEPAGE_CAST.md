@@ -32,7 +32,7 @@ truss kill
 
 ```bash
 # Start the recording. -i 1 trims pauses longer than 1s for tighter playback.
-asciinema rec -i 1 -t "Truss exec: wrap, block, redact, verify" \
+asciinema rec -i 1 -t "Truss proxy exec: wrap, block, redact, verify" \
   www/public/demo/truss-exec-wrap.cast
 ```
 
@@ -46,7 +46,7 @@ each block so the cast has narrative pacing:
 # uncomment the curl line — adds about 30s of bootstrap output)
 # curl -sSL https://trusslabs.org/install.sh | bash
 
-truss exec -- gemini-cli
+truss proxy exec -- gemini-cli
 ```
 
 ### Beat 2: block on prompt PHI (inside the wrapped CLI)
@@ -88,7 +88,7 @@ Exit gemini-cli (Ctrl-C or `/exit`).
 
 ```bash
 ls -t ~/.truss/ledger/receipts/$(date -u +%F)/ | head -3
-truss verify ~/.truss/ledger/receipts
+truss receipt verify ~/.truss/ledger/receipts
 ```
 
 ### Stop recording
@@ -113,6 +113,6 @@ exit       # or Ctrl-D — closes asciinema rec
 The current install.sh in `www/public/install.sh` still points at
 `truss-primitives.tar.gz` and bootstraps the v0.2.3-era primitives
 layout. If you want the homepage snippet's `curl | bash` to install
-a `truss` binary that actually has the `exec` subcommand, that
+a `truss` binary that actually has the `proxy exec` subcommand, that
 install script needs a refresh too — out of scope for the cast
 recording, but worth tracking.

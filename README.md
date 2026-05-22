@@ -43,7 +43,7 @@ The `truss` CLI is the Swiss Army knife for auditing AI agents.
 ### Verify sample receipts
 
 ```bash
-truss verify examples/receipts
+truss receipt verify examples/receipts
 ```
 
 The verifier recomputes each receipt hash by zeroing `evidence.receipt_hash`, canonicalizing the JSON, and comparing it to the stored SHA-256.
@@ -54,8 +54,8 @@ Translate a session's hooks.jsonl into traceable nodes, find every retry loop, a
 
 ```bash
 cat ~/.local/share/some-session/hooks.jsonl \
-  | truss translate \
-  | truss analyze --json --flag FLAG_CIRCULAR_REASONING \
+  | truss trace translate \
+  | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING \
   | truss trap run
 ```
 

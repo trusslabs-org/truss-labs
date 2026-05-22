@@ -55,7 +55,7 @@ Fields likely needing review before release include prompt/response text, user i
 Before producing or relying on a receipt, recompute its hash:
 
 ```bash
-truss verify examples/receipts/blocked_phi_address.json
+truss receipt verify examples/receipts/blocked_phi_address.json
 ```
 
 The verifier zeros `evidence.receipt_hash`, canonicalizes the JSON, computes SHA-256, and compares it to the stored value. This is tamper-detection, not cryptographic signing; `evidence.signature` is currently `null`.

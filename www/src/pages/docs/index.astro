@@ -14,6 +14,7 @@ import Layout from '../../layouts/Layout.astro';
 				<li><a href="#trace" class="hover:text-text text-dim hover:no-underline">trace</a></li>
 				<li><a href="#trap" class="hover:text-text text-dim hover:no-underline">trap</a></li>
 				<li><a href="#mcp" class="hover:text-text text-dim hover:no-underline">MCP Integration</a></li>
+				<li><a href="/docs/release/" class="hover:text-text text-dim hover:no-underline">Release Process</a></li>
 			</ul>
 		</aside>
 
@@ -22,7 +23,7 @@ import Layout from '../../layouts/Layout.astro';
 			<div>
 				<h1 class="text-3xl text-accent font-medium mb-4 tracking-tight">The Truss CLI Manual</h1>
 				<p class="text-dim text-sm leading-relaxed mb-6">
-					Truss is designed as a standalone, developer-controlled governance layer. The unified <code>truss</code> binary sits locally on your host, orchestrating local proxies, evaluating real-time policy rules, auditing trace DAGs, and writing cryptographic JSON receipts to disk.
+					Truss is designed as a standalone, developer-controlled governance layer. The unified <code>truss</code> binary sits locally on your host, orchestrating local proxies, evaluating real-time policy rules, auditing trace DAGs, and writing hash-verifiable JSON receipts to disk.
 				</p>
 				<p class="text-dim text-sm leading-relaxed">
 					This document details the noun-first CLI grammar introduced in version 0.3.1.
@@ -55,7 +56,7 @@ curl -sSL https://trusslabs.org/install.sh | bash</code></pre>
 				<div class="space-y-6">
 					<!-- proxy exec -->
 					<div class="space-y-2">
-						<h3 class="text-md text-text font-mono">truss proxy exec [--policy DIR] [--port PORT] -- &lt;command&gt;</h3>
+						<h3 class="text-md text-text font-mono">truss proxy exec [--policy FILE_OR_DIR] [--port PORT] -- &lt;command&gt;</h3>
 						<p class="text-dim text-sm leading-relaxed">
 							Starts the local uvicorn proxy and maps outbound base-URL variables (<code>GOOGLE_GEMINI_BASE_URL</code>, <code>ANTHROPIC_BASE_URL</code>) into the environment of the child shell, executing your agentic workloads under real-time policy filters.
 						</p>
@@ -87,7 +88,7 @@ truss proxy exec --policy ~/policies/phi/ -- gemini-cli</code></pre>
 			<section id="receipt" class="space-y-4">
 				<h2 class="text-xl text-accent border-b border-border-dim pb-2">3. receipt — Audit & Query Engine</h2>
 				<p class="text-dim text-sm leading-relaxed">
-					Receipts are cryptographic, hash-verifiable logs written locally to <code>~/.truss/ledger/receipts/</code> for every intercepted chat transaction.
+					Receipts are content-addressed, hash-verifiable logs written locally to <code>~/.truss/ledger/receipts/</code> for every intercepted chat transaction.
 				</p>
 
 				<div class="space-y-6">
@@ -103,7 +104,7 @@ truss proxy exec --policy ~/policies/phi/ -- gemini-cli</code></pre>
 					<div class="space-y-2">
 						<h3 class="text-md text-text font-mono">truss receipt verify [path]</h3>
 						<p class="text-dim text-sm leading-relaxed">
-							Validates cryptographic tampering of receipt JSON files. Re-computes each receipt signature by zeroing the <code>receipt_hash</code> element, canonicalizing the JSON, and verifying the resulting SHA-256 against the stored hash.
+							Checks receipt JSON files for accidental or manual modification. Recomputes each receipt hash by zeroing the <code>receipt_hash</code> element, canonicalizing the JSON, and comparing the resulting SHA-256 against the stored hash. Receipts are not signed in the current schema.
 						</p>
 						<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code>truss receipt verify ~/.truss/ledger/receipts/2026-05-19/</code></pre>
 					</div>

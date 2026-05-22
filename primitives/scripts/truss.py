@@ -15,9 +15,10 @@ import socket
 import importlib
 import shlex
 import shutil
+import tempfile
 from pathlib import Path
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 # Try to set SIGPIPE to default to handle broken pipes gracefully (Unix only)
 try:
@@ -217,7 +218,13 @@ def cmd_analyze(args):
         emit_pretty(results, node_index)
 
 def cmd_trap(args):
-    script_path = Path(__file__).parent / "truss_trap.py"
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / "truss_trap.py",
+        script_dir / "primitives" / "scripts" / "truss_trap.py",
+        script_dir.parent / "primitives" / "scripts" / "truss_trap.py",
+    ]
+    script_path = next((p for p in candidates if p.exists()), candidates[0])
     cmd = [sys.executable, str(script_path), args.verb]
     if hasattr(args, 'on') and args.on: cmd.extend(["--on", args.on])
     if hasattr(args, 'action') and args.action: cmd.extend(["--action", args.action])
@@ -307,6 +314,107 @@ def cmd_proxy_status(args):
         except Exception as e:
             print(f"Could not read logs: {e}")
 
+def cmd_start(args):
+    """
+    Start the Truss Audit Proxy daemon in the background.
+    """
+    try:
+        import uvicorn
+        import google.genai  # noqa: F401
+    except ImportError:
+        print("🛡️ Truss: Missing proxy components. Bootstrapping...")
+        subprocess.check_call([str(VENV_PYTHON), "-m", "pip", "install", "uvicorn", "fastapi", "httpx", "pyyaml", "pydantic", "google-genai"])
+
+    port = args.port or DEFAULT_PROXY_PORT
+    policy = args.policy
+
+    if is_port_open(port):
+        print(f"🛡️ Truss Audit Proxy is already running on port {port}.")
+        return
+
+    print(f"🛡️ Starting Truss Audit Proxy daemon on port {port}...")
+    proxy_env = os.environ.copy()
+    policy_dir = None
+    policy_tmp = None
+
+    if policy:
+        policy_path = Path(policy).expanduser().absolute()
+        if not policy_path.exists():
+            print(f"Error: policy path not found: {policy_path}", file=sys.stderr)
+            sys.exit(1)
+        if policy_path.is_file():
+            if policy_path.suffix.lower() not in {".yaml", ".yml"}:
+                print(f"Error: policy file must be .yaml or .yml: {policy_path}", file=sys.stderr)
+                sys.exit(1)
+            active_policies_dir = TRUSS_DIR / "active_policies"
+            active_policies_dir.mkdir(parents=True, exist_ok=True)
+            for old_file in active_policies_dir.glob("*"):
+                try: old_file.unlink()
+                except Exception: pass
+            
+            policy_link = active_policies_dir / policy_path.name
+            try:
+                policy_link.symlink_to(policy_path)
+            except OSError:
+                shutil.copy2(policy_path, policy_link)
+            policy_dir = active_policies_dir
+        elif policy_path.is_dir():
+            policy_dir = policy_path
+        else:
+            print(f"Error: policy path is neither file nor directory: {policy_path}", file=sys.stderr)
+            sys.exit(1)
+
+    script_dir = Path(__file__).resolve().parent
+    found_root = None
+    if (script_dir / "primitives" / "audit").exists():
+        found_root = script_dir
+    elif (script_dir.parent / "primitives" / "audit").exists():
+        found_root = script_dir.parent
+    elif (script_dir.parent.parent / "primitives" / "audit").exists():
+        found_root = script_dir.parent.parent
+
+    if found_root:
+        proxy_env["PYTHONPATH"] = f"{found_root}:{proxy_env.get('PYTHONPATH', '')}"
+    else:
+        proxy_env["PYTHONPATH"] = f"{script_dir}:{script_dir.parent}:{proxy_env.get('PYTHONPATH', '')}"
+
+    if found_root:
+        default_policies = found_root / "examples" / "policies"
+        default_taxonomy = found_root / "primitives" / "audit" / "taxonomies" / "phi.yaml"
+        if policy_dir:
+            proxy_env["TRUSS_POLICIES_DIR"] = str(policy_dir)
+        else:
+            proxy_env.setdefault("TRUSS_POLICIES_DIR", str(default_policies))
+        proxy_env.setdefault("TRUSS_TAXONOMIES", str(default_taxonomy))
+    proxy_env.setdefault("TRUSS_RECEIPTS_DIR", str(DEFAULT_RECEIPTS_DIR))
+
+    TRUSS_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = open(PROXY_LOG, "a", buffering=1)
+    log_file.write(f"\n--- Truss Proxy Start Daemon v{VERSION} ---\n")
+    log_file.write(f"CWD: {os.getcwd()}\n")
+    log_file.write(f"PYTHONPATH: {proxy_env.get('PYTHONPATH')}\n")
+    log_file.write(f"SCRIPT_DIR: {script_dir}\n")
+
+    subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "primitives.audit.proxy:create_app_from_env", "--port", str(port), "--factory"],
+        env=proxy_env,
+        stdout=log_file,
+        stderr=log_file,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True
+    )
+
+    retries = 30
+    while not is_port_open(port) and retries > 0:
+        time.sleep(0.2)
+        retries -= 1
+
+    if retries == 0:
+        print(f"Error: Truss Audit Proxy daemon failed to start. Check {PROXY_LOG}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"🛡️ Truss Audit Proxy daemon successfully started on port {port}.")
+
 def cmd_exec(args):
     try:
         import uvicorn
@@ -346,11 +454,32 @@ def cmd_exec(args):
         sys.exit(1)
 
     proxy_proc = None
+    policy_tmp = None
     if not is_port_open(port):
         print(f"🛡️ Starting Truss Audit Proxy on port {port}...")
         proxy_env = os.environ.copy()
+        policy_dir = None
         if policy:
-            proxy_env["TRUSS_POLICY_PATH"] = str(Path(policy).absolute())
+            policy_path = Path(policy).expanduser().absolute()
+            if not policy_path.exists():
+                print(f"Error: policy path not found: {policy_path}", file=sys.stderr)
+                sys.exit(1)
+            if policy_path.is_file():
+                if policy_path.suffix.lower() not in {".yaml", ".yml"}:
+                    print(f"Error: policy file must be .yaml or .yml: {policy_path}", file=sys.stderr)
+                    sys.exit(1)
+                policy_tmp = tempfile.TemporaryDirectory(prefix="truss-policy-")
+                policy_link = Path(policy_tmp.name) / policy_path.name
+                try:
+                    policy_link.symlink_to(policy_path)
+                except OSError:
+                    shutil.copy2(policy_path, policy_link)
+                policy_dir = Path(policy_tmp.name)
+            elif policy_path.is_dir():
+                policy_dir = policy_path
+            else:
+                print(f"Error: policy path is neither file nor directory: {policy_path}", file=sys.stderr)
+                sys.exit(1)
         
         script_dir = Path(__file__).resolve().parent
         
@@ -370,8 +499,8 @@ def cmd_exec(args):
         if found_root:
             default_policies = found_root / "examples" / "policies"
             default_taxonomy = found_root / "primitives" / "audit" / "taxonomies" / "phi.yaml"
-            if policy:
-                proxy_env["TRUSS_POLICIES_DIR"] = str(Path(policy).expanduser().absolute())
+            if policy_dir:
+                proxy_env["TRUSS_POLICIES_DIR"] = str(policy_dir)
             else:
                 proxy_env.setdefault("TRUSS_POLICIES_DIR", str(default_policies))
             proxy_env.setdefault("TRUSS_TAXONOMIES", str(default_taxonomy))
@@ -443,6 +572,8 @@ def cmd_exec(args):
             proxy_proc.terminate()
             proxy_proc.wait()
             print("🛡️ Truss Audit Proxy stopped.")
+        if policy_tmp:
+            policy_tmp.cleanup()
 
 # --- Alias redirection ---
 
@@ -488,6 +619,11 @@ def main():
         cmd_exec(sys.argv[3:])
         return
 
+    # If first arg is 'proxy start', bootstrap and re-exec
+    if len(sys.argv) > 2 and sys.argv[1] == "proxy" and sys.argv[2] == "start":
+        ensure_bootstrap()
+        # Fall through to argument parser handled inside venv
+
     # Special short circuit for install / proxy stop to avoid heavy startup
     if len(sys.argv) > 1 and sys.argv[1] == "install":
         cmd_install(None)
@@ -526,7 +662,7 @@ def main():
     p_receipt_list = receipt_sub.add_parser("list", help="Scan and index local receipts")
     p_receipt_list.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
 
-    p_receipt_verify = receipt_sub.add_parser("verify", help="Validate cryptographic integrity of receipts")
+    p_receipt_verify = receipt_sub.add_parser("verify", help="Validate receipt hashes")
     p_receipt_verify.add_argument("path", type=str, default=str(DEFAULT_RECEIPTS_DIR), nargs="?")
     p_receipt_verify.add_argument("--allow-empty", action="store_true", help="Allow successful verification of empty directories")
 
@@ -577,9 +713,13 @@ def main():
     proxy_sub = p_proxy.add_subparsers(dest="verb", required=True)
 
     p_proxy_exec = proxy_sub.add_parser("exec", help="Execute a command under local Truss governance")
-    p_proxy_exec.add_argument("--policy", help="Path to policy YAML file/directory")
+    p_proxy_exec.add_argument("--policy", help="Path to policy YAML file or directory")
     p_proxy_exec.add_argument("--port", type=int, default=DEFAULT_PROXY_PORT, help="Proxy port to bind/connect")
     p_proxy_exec.add_argument("command_to_run", nargs=argparse.REMAINDER, help="The command and its arguments to run")
+
+    p_proxy_start = proxy_sub.add_parser("start", help="Start the Truss Audit Proxy daemon in the background")
+    p_proxy_start.add_argument("--policy", help="Path to policy YAML file or directory")
+    p_proxy_start.add_argument("--port", type=int, default=DEFAULT_PROXY_PORT, help="Proxy port to bind/connect")
 
     p_proxy_stop = proxy_sub.add_parser("stop", help="Stop any active Truss Audit Proxy daemon")
     p_proxy_stop.add_argument("--port", type=int, default=DEFAULT_PROXY_PORT, help="Target proxy port to stop")
@@ -604,8 +744,9 @@ def main():
         cmd_trap(args)
     elif args.noun == "proxy":
         if args.verb == "exec": cmd_exec(args)
+        elif args.verb == "start": cmd_start(args)
         elif args.verb == "stop": cmd_kill(args)
-        elif args.noun == "proxy" and args.verb == "status": cmd_proxy_status(args)
+        elif args.verb == "status": cmd_proxy_status(args)
 
 if __name__ == "__main__":
     here = Path(__file__).resolve()

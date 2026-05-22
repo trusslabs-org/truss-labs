@@ -51,7 +51,7 @@ The `truss` CLI is the Swiss Army knife for auditing AI agents.
 ### Verify sample receipts
 
 ```bash
-truss verify examples/receipts
+truss receipt verify examples/receipts
 ```
 
 The verifier recomputes each receipt hash by zeroing `evidence.receipt_hash`, canonicalizing the JSON, and comparing it to the stored SHA-256.
@@ -62,8 +62,8 @@ Translate a session's hooks.jsonl into traceable nodes, find every retry loop, a
 
 ```bash
 cat ~/.local/share/some-session/hooks.jsonl \
-  | truss translate \
-  | truss analyze --json --flag FLAG_CIRCULAR_REASONING \
+  | truss trace translate \
+  | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING \
   | truss trap run
 ```
 
@@ -83,48 +83,22 @@ Apache 2.0 — see [LICENSE](LICENSE).
 (no README.md — use list_files to explore)
 </companion_workspace>
 
-<strategic_mandate>
-{
-  "mandate": "Always prioritize clarity over brevity in technical specifications.",
-  "project_key": "global",
-  "last_updated": "2026-03-24T10:00:00Z"
-}
-</strategic_mandate>
-
 <manager_brief>
 Standard architectural oversight.
 </manager_brief>
 
-> ## 🎯 ACTIVE TASK — authoritative imperative
-> **ID:** `333` | **Status:** pending
-> **Subject:** System-level intercepting HTTPS proxy with local CA — catch all outbound traffic from a machine, including browser traffic and unwrappable CLI surfaces
-> **Definition of Done:** ['Decision recorded: pursue path / park / drop. Anchored to a real customer requirement, not speculative.', 'If pursued: working prototype of an mitmproxy-based interceptor that runs the truss middleware chain on intercepted HTTPS traffic to chat.openai.com / api.anthropic.com / generativelanguage.googleapis.com', 'If pursued: documented install/uninstall flow for the local CA, with explicit warnings about the trust blast radius', 'If parked: this file remains as the architectural reference for why we chose paths 1 (`truss exec`) and 2 (#332 extension) over 3']
-> _All other sections (Last Session, Recent Arc, Next Step) are historical context. If they reference a different task ID, prefer this block._
+## Active Task
+_No active task registered._
 
 ## Manager Brief
 
 Standard architectural oversight.
 
 ## Last Session
-_2026-05-19 01:47_
-**Intent:** Make Truss panel-ready for the 2026-05-21 CCC DoIT demo: wrap gemini-cli and claude through the audit proxy, ship the middleware-chain refactor with multi-turn redaction fidelity, deploy both Pages and the GCP VM, and consolidate panel-prep docs.
-**Summary:** Shipped 7 PRs to main covering (1) reverse-proxy passthrough that wraps gemini-cli and claude via base-URL env vars with inbound-key forwarding so truss holds no upstream creds; (2) middleware-chain architecture mirroring the Soul OS kernel pattern (Classify/Policy/Redaction/Receipt) with RedactionMiddleware swap-table that rewrites redacted assistant turns back to original before forwarding upstream and block-history strip that drops prior block-exchange pairs — both fixing 'model spirals after seeing modified history' failure modes; (3) operational fixes: latest-user-turn-only classification, neutral redact marker, truss kill subcommand, install.sh + tarball refresh to v0.3.0, expanded DOB regex to catch month-name formats; (4) trusslabs.org rewrite: homepage Show me reframed around truss exec, install+wrap asciinema cast + MP4 download link, demo.trusslabs.org cast embed, 'Block and redact are not the same thing' blog post; (5) deployed via wrangler (Pages) and provision.sh (GCP VM at tldw-app/us-east1-b/truss-demo); (6) filed tasks #328-333 (328-330 completed with verification artifacts in task history; 331-333 parked with explicit scope); (7) consolidated 4 overlapping panel-prep docs into PANEL_PREP.md + QA_BANK.md + DEMO_PLAYBOOK.md, with the question 'does process wrap include desktop apps?' answered in QA_BANK §2 covering the Cursor-vs-ChatGPT-desktop distinction.
-**Rationale:** Multi-turn redaction fidelity (swap-table + block-history strip, both verified live in gemini-stock TUI with clean thinking-trace) is the genuinely novel architectural beat for the security audience; the rest is operational polish that prevents flapping verdicts (DOB regex recall) and stale install.sh from breaking trust on first contact. The middleware-chain refactor is a port of the Soul OS kernel pattern — first non-kernel adopter — which makes the architecture legible to anyone who reads the kernel docs.
-
-## Next Step
-User runs 30-min dry-run of DEMO_PLAYBOOK end-to-end Wednesday evening against the deployed VM; reads QA_BANK.md the morning of the CCC DoIT panel (Thursday 2026-05-21 11:30 ET).
-
-## Fixed — Do Not Repeat
-- Modified: reply_acceptance_2026-05-15.md
-- Modified: sharon_vaishnavi_demo_plan.md
-- Modified: RECEIPT_SCHEMA.md
-- Modified: SECURITY.md
-- Modified: 329.json
-- Modified: 330.json
-- Modified: 331.json
-- Modified: 332.json
-- Modified: 333.json
-- Modified: feedback_audit_claims_against_code.md
+_2026-05-20 20:22_
+**Intent:** Codex Desktop turn completed
+**Summary:** Synthetic Codex turn summary for Soul notify bridge.
+**Rationale:** Captured from Codex notify agent-turn-complete payload.
 
 ## Active Specialists
 `@systems_architect`
@@ -503,7 +477,8 @@ Parameters:
       "audit"
     ],
     "narrative_taxonomist": [],
-    "visual_auditor": []
+    "visual_auditor": [],
+    "README": []
   },
   "skill_to_agent": {
     "uxe-prototyping": "creative_technologist",
@@ -546,4 +521,4 @@ Keep the whole block under 240 chars. Skip on trivial conversational turns (gree
 _Schema violations cause "undefined" in dashboards and API responses._
 
 
-<!-- Teddy Hydration Stamp: 2026-05-19 01:47:23 | Project: truss-labs -->
+<!-- Teddy Hydration Stamp: 2026-05-20 20:22:05 | Project: truss-labs -->

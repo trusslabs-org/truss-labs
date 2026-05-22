@@ -139,6 +139,23 @@ class ChatResponse(BaseModel):
     policy_set_version: str
 
 
+class ExtensionCheckRequest(BaseModel):
+    text: Optional[str] = Field(default=None)
+    body: Optional[Dict[str, Any]] = Field(default=None)
+    direction: str = Field("prompt")  # "prompt" or "response"
+    vendor: str = Field("chatgpt")  # "chatgpt" or "claude"
+    user_id: str = Field("extension-user")
+
+
+class ExtensionCheckResponse(BaseModel):
+    verdict: str  # "allowed" | "blocked" | "redacted"
+    text: str  # Original or redacted text
+    block_message: Optional[str] = None
+    receipt_path: Optional[str] = None
+    mutated_body: Optional[Dict[str, Any]] = None
+    mock_response: Optional[Dict[str, Any]] = None
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -257,6 +274,111 @@ def create_app(
         body = await request.json()
         return await _run_anthropic(
             chain, body, x_api_key, authorization, anthropic_version, anthropic_beta,
+        )
+
+    # ------------------------------------------------------------------
+    # ChatGPT / OpenAI Chat Completions-compatible surface (passthrough).
+    # The `openai` client or chrome-extension can target this surface.
+    # ------------------------------------------------------------------
+
+    @app.post("/v1/chat/completions")
+    async def chatgpt_completions(
+        request: Request,
+        authorization: Optional[str] = Header(default=None),
+    ):
+        if not authorization:
+            raise HTTPException(status_code=401, detail="missing authorization header")
+        body = await request.json()
+        return await _run_chatgpt(chain, body, authorization)
+
+    # ------------------------------------------------------------------
+    # Extension-specific direct policy check endpoint.
+    # ------------------------------------------------------------------
+
+    @app.post("/v1/extension/check", response_model=ExtensionCheckResponse)
+    def extension_check(req: ExtensionCheckRequest) -> ExtensionCheckResponse:
+        from .surfaces import ChatGPTWebSurface, ClaudeWebSurface
+
+        actor = {"user_id": req.user_id, "user_role": "web-user"}
+        tool = {"tool_id": f"{req.vendor}-extension", "model_id": f"{req.vendor}-web"}
+
+        # Select appropriate surface adapter
+        surface = None
+        if req.vendor == "chatgpt":
+            surface = ChatGPTWebSurface()
+        elif req.vendor == "claude":
+            surface = ClaudeWebSurface()
+
+        # If body is provided, extract text using the surface adapter
+        text = req.text
+        if req.body and surface:
+            if req.direction == "prompt":
+                text = surface.extract_prompt_text(req.body)
+            else:
+                text = surface.extract_response_text(req.body)
+
+        if not text:
+            text = req.text or ""
+
+        hits = _classify_all(text, req.direction, classifiers)
+        evaluation = evaluate(
+            text=text,
+            direction=req.direction,
+            destination="external_vendor",
+            class_hits=hits,
+            policy_set=policy_set,
+        )
+
+        receipt_path = None
+        if req.direction == "prompt" and evaluation.final_verdict == "blocked":
+            path, _ = _write_receipt(
+                writer=writer,
+                actor=actor,
+                tool=tool,
+                prompt_text=text,
+                response_text="",
+                prompt_hits=hits,
+                response_hits=[],
+                policy_evaluations=[evaluation],
+                llm_meta=None,
+                retention_policy="default_seven_year",
+                retention_years=7,
+                retention_days=None,
+            )
+            receipt_path = str(path)
+        else:
+            path, _ = _write_receipt(
+                writer=writer,
+                actor=actor,
+                tool=tool,
+                prompt_text=text if req.direction == "prompt" else "Extension response check",
+                response_text=evaluation.mutated_text or text if req.direction == "response" else "",
+                prompt_hits=hits if req.direction == "prompt" else [],
+                response_hits=hits if req.direction == "response" else [],
+                policy_evaluations=[evaluation],
+                llm_meta=None,
+                retention_policy="default_seven_year",
+                retention_years=7,
+                retention_days=None,
+            )
+            receipt_path = str(path)
+
+        mutated_body = None
+        mock_response = None
+
+        if req.body and surface:
+            if evaluation.final_verdict == "blocked":
+                mock_response = surface.build_block_payload("web-model", evaluation.block_user_message or "Blocked by Truss Policy")
+            elif evaluation.final_verdict == "redacted":
+                mutated_body = surface.redact_response(req.body, evaluation.mutated_text or text)
+
+        return ExtensionCheckResponse(
+            verdict=evaluation.final_verdict,
+            text=evaluation.mutated_text or text,
+            block_message=evaluation.block_user_message,
+            receipt_path=receipt_path,
+            mutated_body=mutated_body,
+            mock_response=mock_response,
         )
 
     return app
@@ -615,12 +737,72 @@ async def _run_anthropic(
     return await chain.run(body, ctx, _forward, _emit)
 
 
+# ---------------------------------------------------------------------------
+# ChatGPT / OpenAI Chat Completions passthrough
+# ---------------------------------------------------------------------------
+
+
+def _openai_sse_for_payload(payload: Dict[str, Any]):
+    from .surfaces import ChatGPTSurface
+    text = ChatGPTSurface.extract_response_text(payload)
+    events = [
+        {"choices": [{"delta": {"role": "assistant", "content": ""}, "index": 0, "finish_reason": None}]},
+        {"choices": [{"delta": {"content": text}, "index": 0, "finish_reason": None}]},
+        {"choices": [{"delta": {}, "index": 0, "finish_reason": "stop"}]}
+    ]
+    for ev in events:
+        yield f"data: {json.dumps(ev)}\n\n"
+    yield "data: [DONE]\n\n"
+
+
+async def _run_chatgpt(chain, body: Dict[str, Any], authorization: str):
+    import httpx
+    from .middleware import RouteContext
+    from .surfaces import ChatGPTSurface
+
+    model_name = body.get("model") or "gpt-4o"
+    wants_stream = bool(body.get("stream"))
+
+    ctx = RouteContext(
+        surface=ChatGPTSurface(),
+        model=model_name,
+        actor={"user_id": os.environ.get("TRUSS_DEFAULT_USER", "chatgpt-cli"), "user_role": "developer"},
+        tool={"tool_id": "chatgpt-cli", "model_id": model_name},
+        wants_stream=wants_stream,
+    )
+
+    async def _forward(body, ctx):
+        upstream_body = dict(body)
+        upstream_body.pop("stream", None)
+        headers = {
+            "content-type": "application/json",
+            "authorization": authorization,
+        }
+        t0 = time.perf_counter()
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            up = await client.post("https://api.openai.com/v1/chat/completions", json=upstream_body, headers=headers)
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        if up.status_code >= 400:
+            return JSONResponse(
+                status_code=up.status_code,
+                content={"truss": "upstream_error", "upstream_status": up.status_code, "body": up.text},
+            ), latency_ms
+        return up.json(), latency_ms
+
+    def _emit(payload):
+        return StreamingResponse(_openai_sse_for_payload(payload), media_type="text/event-stream")
+
+    return await chain.run(body, ctx, _forward, _emit)
+
+
 __all__ = [
     "LLMClient",
     "StubLLMClient",
     "GeminiClient",
     "ChatRequest",
     "ChatResponse",
+    "ExtensionCheckRequest",
+    "ExtensionCheckResponse",
     "create_app",
     "create_app_from_env",
 ]

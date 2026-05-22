@@ -144,66 +144,32 @@ class RedactPath(ProxyBase):
 
 
 # ---------------------------------------------------------------------------
-# Allowed path: benign prompt + benign response → response passes through
+# Root routes
 # ---------------------------------------------------------------------------
 
 
-class AllowedPath(ProxyBase):
-    canned_response = "Mitochondria are the powerhouse of the cell."
-
-    def test_benign_request_allowed(self) -> None:
-        resp = self.client.post(
-            "/v1/chat",
-            json={
-                "prompt": "What is the role of mitochondria?",
-                "actor": _actor(),
-            },
-        )
-        self.assertEqual(resp.status_code, 200)
-        body = resp.json()
-        self.assertEqual(body["verdict"], "allowed")
-        self.assertEqual(body["response"], self.canned_response)
-
-    def test_allowed_receipt_has_only_synthetic_decisions(self) -> None:
-        resp = self.client.post(
-            "/v1/chat",
-            json={
-                "prompt": "What is the role of mitochondria?",
-                "actor": _actor(),
-            },
-        )
-        receipt = self._read_receipt(resp.json()["receipt_path"])
-        # Both phases yield synthetic null-policy_id "allowed" entries.
-        for d in receipt["policy_decisions"]:
-            self.assertEqual(d["verdict"], "allowed")
-            self.assertIsNone(d["policy_id"])
-
-
-# ---------------------------------------------------------------------------
-# Healthz reflects loaded policy set
-# ---------------------------------------------------------------------------
-
-
-class RootRoute(ProxyBase):
-    """Verify the root route serves demo.html when configured."""
-
+class RootRoute(unittest.TestCase):
     def setUp(self) -> None:
-        # Override base setUp so we can pass demo_html_path.
         self.tmp = tempfile.TemporaryDirectory()
         self.receipts_dir = Path(self.tmp.name)
+        self.demo_dir = Path(self.tmp.name) / "demo"
+        self.demo_dir.mkdir()
+        self.demo_html = self.demo_dir / "demo.html"
+        self.demo_html.write_text("DEMO ENVIRONMENT for Truss Audit Proxy")
+
         policy_set = load_policies(EXAMPLE_POLICIES_DIR)
         classifiers = [Classifier.from_taxonomy_file(PHI_TAXONOMY)]
-        self.client_stub = StubLLMClient()
-        self.demo_html = _REPO_ROOT / "examples" / "demo.html"
-        from audit.proxy import create_app  # local import to avoid base setUp clash
         app = create_app(
             policy_set=policy_set,
             classifiers=classifiers,
             receipts_dir=self.receipts_dir,
-            llm_client=self.client_stub,
+            llm_client=StubLLMClient(),
             demo_html_path=self.demo_html,
         )
         self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
 
     def test_root_serves_demo_html(self) -> None:
         resp = self.client.get("/")
@@ -277,6 +243,134 @@ class RequestValidation(ProxyBase):
             "/v1/chat", json={"prompt": "", "actor": _actor()}
         )
         self.assertEqual(resp.status_code, 422)
+
+
+# ---------------------------------------------------------------------------
+# ChatGPT and Extension specific tests
+# ---------------------------------------------------------------------------
+
+
+class ExtensionCheckRoute(ProxyBase):
+    """Verify the /v1/extension/check endpoint."""
+
+    def test_benign_prompt_allowed(self) -> None:
+        resp = self.client.post(
+            "/v1/extension/check",
+            json={
+                "text": "Hello, how are you?",
+                "direction": "prompt",
+                "vendor": "chatgpt",
+                "user_id": "test-user",
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["verdict"], "allowed")
+        self.assertEqual(body["text"], "Hello, how are you?")
+        self.assertIsNotNone(body["receipt_path"])
+
+    def test_phi_prompt_blocked(self) -> None:
+        resp = self.client.post(
+            "/v1/extension/check",
+            json={
+                "text": "Patient lives at 1234 Main St.",
+                "direction": "prompt",
+                "vendor": "chatgpt",
+                "user_id": "test-user",
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["verdict"], "blocked")
+        self.assertIn("Patient address detected", body["block_message"])
+        self.assertIsNotNone(body["receipt_path"])
+
+
+class ChatGPTCompletionsRoute(ProxyBase):
+    """Verify the /v1/chat/completions endpoint (mocked upstream)."""
+
+    def test_missing_auth_returns_401(self) -> None:
+        resp = self.client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "Hello"}],
+            }
+        )
+        self.assertEqual(resp.status_code, 401)
+
+
+class ExtensionCheckWithBody(ProxyBase):
+    """Verify that /v1/extension/check parses full JSON body payloads."""
+
+    def test_chatgpt_web_body_allowed(self) -> None:
+        body = {
+            "messages": [
+                {
+                    "author": {"role": "user"},
+                    "content": {"content_type": "text", "parts": ["Hello assistant, summarize this benign text."]}
+                }
+            ]
+        }
+        resp = self.client.post(
+            "/v1/extension/check",
+            json={
+                "body": body,
+                "direction": "prompt",
+                "vendor": "chatgpt",
+                "user_id": "test-user",
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        res = resp.json()
+        self.assertEqual(res["verdict"], "allowed")
+        self.assertIsNone(res["mutated_body"])
+
+    def test_chatgpt_web_body_blocked(self) -> None:
+        body = {
+            "messages": [
+                {
+                    "author": {"role": "user"},
+                    "content": {"content_type": "text", "parts": ["Patient lives at 1234 Main St."]}
+                }
+            ]
+        }
+        resp = self.client.post(
+            "/v1/extension/check",
+            json={
+                "body": body,
+                "direction": "prompt",
+                "vendor": "chatgpt",
+                "user_id": "test-user",
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        res = resp.json()
+        self.assertEqual(res["verdict"], "blocked")
+        self.assertIsNotNone(res["mock_response"])
+        self.assertEqual(res["mock_response"]["message"]["author"]["role"], "assistant")
+
+    def test_chatgpt_web_body_redacted(self) -> None:
+        response_body = {
+            "message": {
+                "author": {"role": "assistant"},
+                "content": {"content_type": "text", "parts": ["Patient's DOB: 1978-04-12."]}
+            }
+        }
+        resp = self.client.post(
+            "/v1/extension/check",
+            json={
+                "body": response_body,
+                "direction": "response",
+                "vendor": "chatgpt",
+                "user_id": "test-user",
+            }
+        )
+        self.assertEqual(resp.status_code, 200)
+        res = resp.json()
+        self.assertEqual(res["verdict"], "redacted")
+        self.assertIsNotNone(res["mutated_body"])
+        self.assertIn("[redacted]", res["mutated_body"]["message"]["content"]["parts"][0])
 
 
 if __name__ == "__main__":

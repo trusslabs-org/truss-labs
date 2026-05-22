@@ -9,7 +9,7 @@ These receipts are static examples for reviewers who want to inspect the audit a
 Verify the hashes:
 
 ```bash
-truss verify examples/receipts
+truss receipt verify examples/receipts
 ```
 
 The verifier recomputes `evidence.receipt_hash` from the canonical JSON after setting that field to an empty string. These receipts are content-addressed, not cryptographically signed; `evidence.signature` is intentionally `null`.

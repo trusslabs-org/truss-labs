@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  truss-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: truss-labs/audit-proxy:latest
+    container_name: truss-audit-proxy
+    ports:
+      - "8000:8000"
+    environment:
+      - TRUSS_POLICIES_DIR=/app/examples/policies
+      - TRUSS_TAXONOMIES=/app/primitives/audit/taxonomies/phi.yaml
+      - TRUSS_RECEIPTS_DIR=/root/.truss/ledger/receipts
+    volumes:
+      # Map container ledger directory to the host's standard ~/.truss directory
+      - ~/.truss:/root/.truss
+      # Bind local policies directory so custom policies on host auto-load inside the container
+      - ./examples/policies:/app/examples/policies:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

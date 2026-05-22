@@ -33,5 +33,12 @@ echo "taxonomies:  ${TRUSS_TAXONOMIES}"
 echo "model:       ${GEMINI_MODEL_ID:-gemini-3-flash-preview}  ($([ -n "${GEMINI_API_KEY:-}" ] && echo real || echo stub))"
 echo "listening:   http://${HOST}:${PORT}"
 echo
-exec python3 -m uvicorn primitives.audit.proxy:create_app_from_env \
+
+# Prefer Homebrew Python as it contains dependencies
+PYTHON_BIN="/opt/homebrew/bin/python3"
+if [[ ! -f "$PYTHON_BIN" ]]; then
+  PYTHON_BIN="python3"
+fi
+
+exec "$PYTHON_BIN" -m uvicorn primitives.audit.proxy:create_app_from_env \
   --factory --host "${HOST}" --port "${PORT}"

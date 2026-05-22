@@ -1,0 +1,114 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Release Process" description="Release checklist for keeping the Truss CLI, installer, tarballs, docs, and demo in sync.">
+	<article class="max-w-3xl space-y-10">
+		<header class="space-y-3">
+			<h1 class="text-3xl text-accent font-medium tracking-tight">Truss Release Process</h1>
+			<p class="text-dim text-sm leading-relaxed">
+				This is the public release checklist for the Truss CLI and demo surfaces. It exists because the CLI, installer, tarballs, static site, and demo VM can drift unless they are verified as one release unit.
+			</p>
+		</header>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Canonical domains</h2>
+			<p class="text-dim text-sm leading-relaxed">
+				The visible public URLs are <code>https://trusslabs.org/</code>, <code>https://trusslabs.org/docs/</code>, and <code>https://demo.trusslabs.org/</code>.
+			</p>
+			<p class="text-dim text-sm leading-relaxed">
+				Alias hostnames should redirect to those canonical URLs: <code>www.trusslabs.org/*</code> to <code>trusslabs.org/*</code>, and <code>docs.trusslabs.org/*</code> to <code>trusslabs.org/docs/*</code>. DNS can point a hostname to a service, but it cannot point a hostname to a path like <code>/docs/</code>; that path mapping has to be an HTTP redirect.
+			</p>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Release surfaces</h2>
+			<ul class="list-disc pl-5 text-dim text-sm leading-relaxed space-y-2">
+				<li><code>primitives/scripts/truss.py</code> — CLI source and <code>truss --version</code>.</li>
+				<li><code>pyproject.toml</code> — package metadata.</li>
+				<li><code>www/public/install.sh</code> — public installer served from <code>trusslabs.org/install.sh</code>.</li>
+				<li><code>www/public/demo/truss-primitives.tar.gz</code> — generic latest tarball.</li>
+				<li><code>www/public/demo/truss-primitives-vX.Y.Z.tar.gz</code> — versioned tarball.</li>
+				<li><code>www/src/pages/docs/index.astro</code> — CLI manual.</li>
+				<li><code>examples/demo.html</code> — page served by <code>demo.trusslabs.org</code>.</li>
+			</ul>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Pre-release checks</h2>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code>VERSION="$(python3 primitives/scripts/truss.py --version | cut -d' ' -f2)"
+grep -q "version = \"$VERSION\"" pyproject.toml
+grep -q "VERSION=\"$VERSION\"" www/public/install.sh
+grep -q "VERSION=\"$VERSION\"" build-tarball.sh
+
+rg "truss verify|truss translate|truss analyze|truss exec|0\\.3\\.0|0\\.1\\.0" \
+  README.md docs examples www/src www/public/install.sh build-tarball.sh pyproject.toml primitives/scripts \
+  -g '!*.cast'</code></pre>
+			<p class="text-dim text-sm leading-relaxed">
+				Expected remaining hits are compatibility or deprecation strings in source, plus the grep pattern in the release checklist itself.
+			</p>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Build and verify artifacts</h2>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code>./build-tarball.sh
+
+tmpdir="$(mktemp -d)"
+tar -xzf www/public/demo/truss-primitives.tar.gz -C "$tmpdir" --strip-components=1
+"$tmpdir/truss" --version
+"$tmpdir/truss" receipt verify "$tmpdir/examples/receipts"
+"$tmpdir/truss" trap clear >/dev/null
+"$tmpdir/truss" trap add --on ON_RETRY --action ACTION_HALT >/dev/null
+cat "$tmpdir/hooks.jsonl" \
+  | "$tmpdir/truss" trace translate \
+  | "$tmpdir/truss" trace analyze --json --flag FLAG_CIRCULAR_REASONING \
+  | "$tmpdir/truss" trap run
+"$tmpdir/truss" trap clear >/dev/null
+"$tmpdir/truss" proxy exec --policy "$tmpdir/examples/policies/phi_block_address_in_external_prompt.yaml" --port 8126 -- /usr/bin/true
+rm -rf "$tmpdir"</code></pre>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Deploy</h2>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code># trusslabs.org
+cd www
+npm run build
+npx wrangler pages deploy dist --project-name truss-labs
+
+# demo.trusslabs.org
+# Re-run the GCP update flow in examples/deploy/gcp/README.md.</code></pre>
+			<p class="text-dim text-sm leading-relaxed">
+				The demo VM should serve <code>examples/demo.html</code> from the repo source, not a hand-edited copy.
+			</p>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Post-deploy verification</h2>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs"><code>curl -fsSL https://trusslabs.org/install.sh | grep 'VERSION="'
+curl -fsSL https://trusslabs.org/docs/ | rg 'truss proxy exec|hash-verifiable|not signed'
+curl -fsSL https://trusslabs.org/ | rg 'truss proxy exec|truss receipt verify|truss trace translate'
+
+for url in \
+  https://trusslabs.org/demo/truss-primitives.tar.gz \
+  "https://trusslabs.org/demo/truss-primitives-v$VERSION.tar.gz"
+do
+  tmpdir="$(mktemp -d)"
+  curl -fsSL "$url" -o "$tmpdir/truss.tgz"
+  tar -xzf "$tmpdir/truss.tgz" -C "$tmpdir" --strip-components=1
+  "$tmpdir/truss" --version
+  "$tmpdir/truss" receipt verify "$tmpdir/examples/receipts"
+  rm -rf "$tmpdir"
+done
+
+curl -fsSL https://demo.trusslabs.org/ | rg 'truss proxy exec'
+curl -fsSL https://demo.trusslabs.org/healthz</code></pre>
+		</section>
+
+		<section class="space-y-4">
+			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Docs route</h2>
+			<p class="text-dim text-sm leading-relaxed">
+				The canonical docs route is <code>https://trusslabs.org/docs/</code>. The <code>docs.trusslabs.org</code> subdomain is an alias and should redirect to the canonical docs route.
+			</p>
+		</section>
+	</article>
+</Layout>

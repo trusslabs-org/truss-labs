@@ -27,6 +27,22 @@ That's it. Wrangler prints the preview URL (something like `https://<hash>.truss
 
 Production domain: <https://trusslabs.org>
 
+## Canonical domains
+
+Use these as the visible public URLs:
+
+- <https://trusslabs.org/> — main site
+- <https://trusslabs.org/docs/> — docs
+- <https://demo.trusslabs.org/> — live demo
+
+Alias hostnames should redirect to canonical URLs:
+
+- `www.trusslabs.org/*` → `trusslabs.org/*`
+- `docs.trusslabs.org/*` → `trusslabs.org/docs/*`
+
+DNS only maps hostnames to services. It cannot map `docs.trusslabs.org` directly
+to `/docs/`; use Cloudflare Redirect Rules for that path mapping.
+
 ## Verify
 
 Three quick checks after a deploy:

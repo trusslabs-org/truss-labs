@@ -35,7 +35,7 @@ It enables:
 Truss Labs is building in public. Our current sprints include:
 *   **Pillar I**: Industrialization of the Truss Kernel (Zenith v8.7+).
 *   **Pillar II**: The Trace-Tree Interface (The Control Plane).
-*   **Pillar III**: Agentic Primitives (`truss analyze`, `truss trap`, `truss ingest`).
+*   **Pillar III**: Agentic Primitives (`truss trace analyze`, `truss trap`, `truss ingest`).
 
 The goal is a **Sovereign Intelligence Platform** that can run on-premise, securely, and deterministically.
 

@@ -3,19 +3,36 @@ set -e
 REPO_ROOT=$(pwd)
 BUILD_DIR="tmp/truss-primitives"
 TARGET_DIR="www/public/demo"
-VERSION="0.3.0"
+VERSION="0.3.2"
 TARBALL="truss-primitives-v$VERSION.tar.gz"
 
 echo "Building $TARBALL..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/primitives"
 
-# Copy main entry point to root as 'truss'
-cp primitives/scripts/truss.py "$BUILD_DIR/truss"
+# Create root entry point as 'truss'. Keep it as a tiny wrapper so module-local
+# paths such as primitives/scripts/truss_trap.py resolve correctly.
+cat > "$BUILD_DIR/truss" <<'PY'
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+root = Path(__file__).resolve().parent
+sys.path.insert(0, str(root))
+sys.path.insert(0, str(root / "primitives" / "scripts"))
+
+from primitives.scripts.truss import main
+
+if __name__ == "__main__":
+    main()
+PY
 chmod +x "$BUILD_DIR/truss"
 
 # Copy the entire primitives tree (including scripts and audit)
 cp -r primitives/* "$BUILD_DIR/primitives/"
+mkdir -p "$BUILD_DIR/examples"
+cp -r examples/policies "$BUILD_DIR/examples/"
+cp -r examples/receipts "$BUILD_DIR/examples/"
 
 # Ensure __init__.py exists in the primitives folder for namespace/module resolution
 touch "$BUILD_DIR/primitives/__init__.py"
@@ -37,7 +54,11 @@ This package contains the core CLI tools for the Truss Audit substrate.
    ./truss --help
 
 2. Run the sample pipe:
-   cat hooks.jsonl | ./truss translate | ./truss analyze --json --flag FLAG_CIRCULAR_REASONING | ./truss trap run
+   ./truss trap add --on ON_RETRY --action ACTION_HALT
+   cat hooks.jsonl | ./truss trace translate | ./truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | ./truss trap run
+
+3. Verify the sample receipts:
+   ./truss receipt verify examples/receipts
 
 License: Apache 2.0
 " > "$BUILD_DIR/README.md"
