@@ -5,11 +5,11 @@ interface Props {
 }
 
 const { title, description = "AI activity visibility on infrastructure you control" } = Astro.props;
-const isDocs = Astro.url.pathname.startsWith('/docs');
+const usePaperTheme = Astro.url.pathname.startsWith('/docs') || Astro.url.pathname.startsWith('/blog');
 ---
 
 <!doctype html>
-<html lang="en" data-theme={isDocs ? 'paper' : 'dark'}>
+<html lang="en" data-theme={usePaperTheme ? 'paper' : 'dark'}>
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
@@ -29,7 +29,7 @@ const isDocs = Astro.url.pathname.startsWith('/docs');
 				font-family: var(--font-mono);
 			}
 			body {
-				@apply p-6 md:p-12 max-w-4xl mx-auto;
+				@apply p-6 md:p-12 max-w-3xl mx-auto;
 			}
 			h1, h2, h3 {
 				@apply font-bold tracking-tight;
@@ -40,12 +40,14 @@ const isDocs = Astro.url.pathname.startsWith('/docs');
 		</style>
 	</head>
 	<body class="bg-bg text-text selection:bg-accent selection:text-bg">
-		<header class="mb-16 border-b border-border-dim pb-8 flex justify-between items-end">
-			<div>
-				<h1 class="text-2xl text-accent"><a href="/" class="hover:no-underline text-accent">Truss Labs Inc.</a></h1>
-				<p class="text-dim text-sm mt-1">{description}</p>
+		<header class="mb-16 border-b border-border-dim pb-8 flex flex-row justify-between items-baseline gap-4 flex-wrap">
+			<div class="flex flex-row items-baseline gap-4 shrink min-w-0">
+				<h1 class="text-2xl text-accent font-bold tracking-tight whitespace-nowrap shrink-0">
+					<a href="/" class="hover:no-underline text-accent">Truss Labs Inc.</a>
+				</h1>
+				<span class="text-dim text-sm truncate">AI activity visibility on infrastructure you control</span>
 			</div>
-			<nav class="flex gap-6 text-sm">
+			<nav class="flex gap-6 text-sm shrink-0">
 				<a href="/blog">Blog</a>
 				<a href="/governance">Governance</a>
 				<a href="https://github.com/trusslabs-org/truss-labs">Source</a>

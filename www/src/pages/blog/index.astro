@@ -8,14 +8,14 @@ const posts = (await getCollection('blog')).sort(
 ---
 
 <Layout title="Blog" description="Technical Research & Lab Notes">
-	<section class="space-y-12">
-		<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Lab Notes</h2>
+	<section class="space-y-12 pb-12 text-text leading-relaxed">
+		<h2 class="text-dim border-l-2 border-accent pl-4 mb-8 font-bold tracking-tight">Lab Notes</h2>
 		<div class="space-y-12">
 			{posts.map((post) => (
 				<article class="group">
 					<a href={`/blog/${post.id}`} class="block space-y-2 hover:no-underline">
 						<time class="text-xs text-dim uppercase tracking-widest">{post.data.date}</time>
-						<h3 class="text-xl text-text group-hover:text-accent transition-colors">{post.data.title}</h3>
+						<h3 class="text-xl text-text group-hover:text-accent transition-colors font-bold tracking-tight">{post.data.title}</h3>
 						<p class="text-dim text-sm leading-relaxed max-w-2xl">
 							{post.data.description}
 						</p>

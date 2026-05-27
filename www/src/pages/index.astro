@@ -4,12 +4,7 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 ---
 
 <Layout title="Truss Labs">
-	<main class="max-w-3xl mx-auto px-6 py-20 font-sans text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
-		<header class="mb-16">
-			<h1 class="text-xl tracking-tight mb-2 select-none font-sans font-medium">Truss Labs</h1>
-			<p class="text-dim text-sm tracking-tight select-none">AI activity visibility on infrastructure you control.</p>
-		</header>
-
+	<main class="pb-20 text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
 		<div class="mb-16 text-sm">
 			<p class="mb-4 text-dim">
 				Truss is a lightweight audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a hash-verifiable JSON receipt is written to disk.
@@ -27,9 +22,11 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 					</div>
-					<span class="text-xs text-dim font-mono select-none mx-auto pr-6">demo.trusslabs.org</span>
+					<span class="text-xs text-dim font-mono select-none pl-4">demo.trusslabs.org</span>
 				</div>
-				<div class="aspect-[117/30] w-full p-4 font-mono bg-surface" id="asciinema-demo"></div>
+				<div class="p-4 bg-surface font-mono">
+					<div id="asciinema-demo"></div>
+				</div>
 			</div>
 			<div class="flex justify-between items-center px-1">
 				<span class="text-dim text-xs select-none">Recorded 2026-05-18 (53.5s take).</span>
@@ -86,14 +83,12 @@ truss receipt verify ~/.truss/ledger/receipts</code></pre>
 					'/demo/truss-exec-wrap.cast',
 					target,
 					{
-						cols: 117,
-						rows: 30,
 						autoPlay: true,
 						loop: true,
-						preload: true,
-						terminalFontSize: '12px',
-						terminalFontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
-						theme: 'asciinema'
+						speed: 1.0,
+						theme: 'asciinema',
+						fit: 'width',
+						controls: true
 					}
 				);
 			}

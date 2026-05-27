@@ -3,27 +3,27 @@ import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="Governance" description="Corporate & administrative setup">
-	<section class="prose prose-invert max-w-none">
-		<h2 class="text-dim border-l-2 border-accent pl-4 mb-8">Corporate setup</h2>
+	<section class="pb-12 text-text leading-relaxed">
+		<h2 class="text-dim border-l-2 border-accent pl-4 mb-8 font-bold tracking-tight">Corporate setup</h2>
 
-		<div class="grid md:grid-cols-2 gap-12 not-prose">
+		<div class="grid md:grid-cols-2 gap-12">
 			<div class="space-y-6">
 				<div>
-					<h3 class="text-text text-sm mb-2">Entity</h3>
+					<h3 class="text-text text-sm mb-2 font-bold">Entity</h3>
 					<p class="text-dim">Truss Labs Inc.<br/>New York C-Corporation</p>
 				</div>
 				<div>
-					<h3 class="text-text text-sm mb-2">Registration</h3>
+					<h3 class="text-text text-sm mb-2 font-bold">Registration</h3>
 					<p class="text-dim">Incorporated: April 17, 2026</p>
 				</div>
 				<div>
-					<h3 class="text-text text-sm mb-2">Location</h3>
+					<h3 class="text-text text-sm mb-2 font-bold">Location</h3>
 					<p class="text-dim">Brooklyn, NY</p>
 				</div>
 			</div>
 
-			<div class="bg-white/5 p-8 border border-white/10 space-y-4">
-				<h3 class="text-accent text-sm">How it operates</h3>
+			<div class="bg-white/5 p-8 border border-white/10 space-y-4 rounded">
+				<h3 class="text-accent text-sm font-bold">How it operates</h3>
 				<p class="text-dim text-xs leading-relaxed">
 					Truss Labs is an R&D lab. I picked a NY C-Corp for clean legal separation and low overhead during the pre-revenue phase — not because it's optimal for fundraising later (it isn't always).
 				</p>
@@ -31,13 +31,6 @@ import Layout from '../layouts/Layout.astro';
 					Corporate documents, DNS configs, and filings live in a private <code>ilteris-company</code> repo, separate from the engineering work in <code>truss-labs</code>.
 				</p>
 			</div>
-		</div>
-
-		<div class="mt-16 pt-12 border-t border-white/5">
-			<h3 class="text-text mb-4">Capital</h3>
-			<p class="text-dim text-sm">
-				Capital is personal for now; no outside investment yet.
-			</p>
 		</div>
 	</section>
 </Layout>
