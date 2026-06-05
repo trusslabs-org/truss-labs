@@ -2,7 +2,7 @@
 // Overrides window.fetch and window.XMLHttpRequest to capture and govern chat completions requests.
 
 (function() {
-  const VERSION = "1.0.6";
+  const VERSION = "1.0.7";
   const originalFetch = window.fetch;
   const originalXHROpen = window.XMLHttpRequest.prototype.open;
   const originalXHRSend = window.XMLHttpRequest.prototype.send;
@@ -365,7 +365,21 @@
       console.log(`[Truss Intercept] Target request detected: ${urlStr} (${method})`);
     }
 
-    if ((isChatGPT || isClaude || isGemini) && method === "POST" && rawBody) {
+    // Submit-gate handshake: if the ISOLATED-world submit-gate already pre-checked
+    // this submission, it leaves a nonce on the documentElement dataset. Consume it
+    // and skip the prompt-side policy call to avoid double receipts. Response-side
+    // streaming audit still runs below.
+    let submitGateApproved = false;
+    if ((isChatGPT || isClaude) && method === "POST") {
+      const nonce = document.documentElement.dataset.trussNonce;
+      if (nonce) {
+        delete document.documentElement.dataset.trussNonce;
+        submitGateApproved = true;
+        console.log(`[Truss v${VERSION}] submit-gate pre-approved; skipping fetch-side prompt check (nonce=${nonce})`);
+      }
+    }
+
+    if (!submitGateApproved && (isChatGPT || isClaude || isGemini) && method === "POST" && rawBody) {
       let promptText = "";
       let isFormEncoded = false;
       let bodyJson = null;

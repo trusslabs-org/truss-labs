@@ -562,7 +562,6 @@ class ClaudeWebSurface:
     name = "claude_web"
 
     @staticmethod
-    @staticmethod
     def extract_prompt_text(body: Dict[str, Any]) -> str:
         """Extract prompt text from Claude Web request payload."""
         chunks: List[str] = []

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Truss Audit Layer",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Enterprise policy and audit layer for web LLM clients.",
   "permissions": [
     "activeTab"
@@ -41,6 +41,17 @@
         "content.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "submit-gate.js"
+      ],
+      "run_at": "document_idle"
     }
   ]
 }
