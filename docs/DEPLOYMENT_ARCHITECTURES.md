@@ -6,10 +6,11 @@ This document details the deployment patterns for the Truss browser extension an
 
 ## Architectural Models
 
-Truss supports two deployment models depending on your security, privacy, and infrastructure requirements:
+Truss supports three deployment models depending on your security, privacy, and infrastructure requirements:
 
 1. **Edge Model (Local Agent):** Run the proxy daemon locally on each user's computer.
 2. **Centralized Model (Enterprise Proxy):** Run a single proxy on a secure internal corporate server and point multiple remote extensions to it.
+3. **Enclave-Based Sovereign Model (Confidential Computing):** Run the proxy inside a secure hardware enclave (AWS Nitro Enclaves or GCP Confidential Space) with encrypted memory and cryptographic hardware attestation.
 
 ---
 
@@ -85,40 +86,94 @@ flowchart TD
 
 ---
 
-## Execution Sequence
+### 3. Enclave-Based Sovereign Model (Confidential Computing)
 
-The sequence diagram below maps how the Chrome extension's dual-world message passing layer interacts with the proxy to evaluate, ledger, and govern prompts before they are transmitted upstream.
+In the Enclave-Based Sovereign Model, the Truss proxy runs inside a secure hardware enclave (such as AWS Nitro Enclaves or GCP Confidential Space). The CPU encrypts the enclave's memory space, shielding in-transit prompts and decryption keys from the host operating system, root administrators, and the cloud provider itself. 
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User (Browser)
-    participant Extension as Truss Extension (Isolated Context)
-    participant Proxy as Truss Proxy (Local/Remote)
-    participant LLM as Upstream LLM (OpenAI/Anthropic)
+The system uses cryptographic attestation to prove the exact code running inside the enclave before any client sends sensitive payloads.
 
-    User->{plus}{plus}Extension: Submits prompt on Web UI
-    rect rgb(240, 248, 255)
-        note right of Extension: Intercepts fetch call
-        Extension->{plus}Proxy: POST /v1/extension/check
-        Proxy->Proxy: Classify content & evaluate policy
-        Proxy->Proxy: Write signed JSON receipt to ledger
-        Proxy--{minus}Extension: Return verdict (allow / block / redact) + mutated text
-    end
-    alt Verdict is Blocked
-        Extension--User: Stop request and render block warning UI
-    else Verdict is Allowed / Redacted
-        Extension->{plus}LLM: Forward allowed or redacted prompt upstream
-        LLM--{minus}Extension: Return stream / response
-        Extension--{minus}User: Render response on Web UI
-    end
+#### Topology Diagram
+
 ```
+       +-----------------------------------------------------------+
+       |                     AWS EC2 Host VM                       |
+       |  (Public Network, Runs Cloudflared, Parent Application)   |
+       +-----------------------------------------------------------+
+                                     |
+                          Communicates via VSOCK
+                                     |
+                                     v
+       +-----------------------------------------------------------+
+       |                    AWS Nitro Enclave                      |
+       |                                                           |
+       |  [ Cryptographically Encrypted & Isolated RAM via CPU ]   |
+       |                                                           |
+       |  +-----------------------------------------------------+  |
+       |  |                  Audit Proxy App                    |  |
+       |  |  - Python Audit Proxy Container (FastAPI)           |  |
+       |  |  - KMS Agent (Decrypts Secrets)                     |  |
+       |  |  - Local Policy Engine (YAML)                       |  |
+       |  +-----------------------------------------------------+  |
+       +-----------------------------------------------------------+
+```
+
+#### How the Enclave Architecture Works
+
+#### A. Networking over Virtual Sockets (VSOCK)
+Secure hardware enclaves have no external network cards or direct internet access. To communicate, the proxy inside the enclave listens on a virtual socket (`vsock`). 
+
+We run a lightweight socket proxy (like `socat` or a custom TCP-to-VSOCK bridge) on the host EC2 VM. This bridge forwards incoming HTTPS requests from the browser extensions and forwards outgoing sanitized payloads from the enclave to the upstream model provider (such as Anthropic or Vertex AI).
+
+#### B. Packaging the Docker Container as an Enclave Image File (EIF)
+You write a standard Dockerfile packaging our FastAPI proxy, python dependencies, and a small loopback service. 
+
+To convert this container into a Nitro-compliant bootable image, you run the Nitro CLI on the host EC2 machine:
+
+```bash
+# Compile the Docker container into a bootable Enclave Image File (.eif)
+nitro-cli build-enclave \
+  --docker-uri truss-audit-proxy:latest \
+  --output-file truss-proxy.eif
+```
+
+The output contains the cryptographic measurements (SHA-384 hashes) of the kernel, ramdisk, and your application code:
+
+```json
+{
+  "Measurements": {
+    "PCR0": "1f8e...8b4a",
+    "PCR1": "9a2c...4d3e",
+    "PCR2": "7c5e...2f1b"
+  }
+}
+```
+
+These values are immutable. If a single line of Python code inside the proxy changes, the `PCR0` measurement changes.
+
+#### C. Attestation & Secrets Decryption
+To redact or evaluate prompts, the proxy needs to read YAML policy rules and write signed transaction receipts. If these keys are stored in plaintext on the host VM, your security boundary is broken. 
+
+Instead, the proxy fetches encrypted secrets from AWS KMS or GCP KMS at startup. The KMS service enforces a policy that will **only** decrypt the keys if the calling enclave presents an Attestation Document containing the exact, pre-approved `PCR0` hash.
+
+```
++---------------+           1. Get encrypted key          +-------------+
+|               |---------------------------------------->|             |
+|  Truss Proxy  |                                         |   AWS KMS   |
+|  (In Enclave) |<----------------------------------------|             |
+|               |   2. Decrypted key (Only if PCR0 ok)    +-------------+
++---------------+
+```
+
+#### GCP Confidential Space Alternative
+If deploying on Google Cloud Platform, the architecture utilizes **AMD SEV-SNP (Secure Encrypted Virtualization-Secure Nested Paging)**. 
+* Instead of Nitro EIFs, GCP Confidential Space runs standard Open Container Initiative (OCI) containers directly.
+* Attestation is verified via AMD’s hardware chip, which communicates with Google’s OIDC token service to generate an attestation token. This token is used to authenticate with GCP Secret Manager and release the proxy decryption keys.
 
 ---
 
 ## Technical Requirements & Constraints
 
-Deploying the centralized pattern requires addressing several browser security controls:
+Deploying the centralized and enclave patterns requires addressing several browser security controls:
 
 ### 1. Chrome Manifest V3 Host Permissions
 Chrome blocks requests from extension scripts to external servers unless declared in the extension manifest.
@@ -137,24 +192,24 @@ Chrome blocks requests from extension scripts to external servers unless declare
 
 ### 2. TLS and Enterprise Certificate Trust
 When using an HTTPS endpoint like `https://truss-proxy.internal.corp`, the SSL/TLS certificate **must be trusted by the client browser**.
-* If you are using an internal Private CA or self-signed certificate, the CA root certificate must be distributed to each employee machine's system trust store (e.g., via Jamf, Kanon, or Active Directory Group Policy).
+* If you are using an internal Private CA or self-signed certificate, the CA root certificate must be distributed to each employee machine's system trust store (e.g., via Jamf or Active Directory Group Policy).
 * Untrusted certificates cause Chrome to reject the background fetch, which triggers Truss's fail-closed security mode.
 
 ### 3. Cross-Origin Resource Sharing (CORS)
 When the extension issues a fetch request, Chrome transmits the origin of the webpage where the user is typing (such as `Origin: https://chatgpt.com` or `Origin: https://claude.ai`).
 * The central Truss server must handle these cross-origin preflight requests correctly.
-* Truss’s FastAPI proxy includes pre-configured permissive CORS middleware (`allow_origins=["*"]`) which automatically accepts requests and returns appropriate headers.
+* Truss’s FastAPI proxy includes pre-configured CORS middleware (`allow_origins=["*"]`) which automatically accepts requests and returns appropriate headers.
 
 ### 4. Network Fail-Closed Security (Privacy Safeguard)
-If a remote employee is disconnected from the corporate VPN or network, the central proxy `https://truss-proxy.internal.corp` will become unreachable.
-* **Fail-Closed Behavior:** The extension will instantly intercept prompt attempts, detect that the proxy is unreachable, and block the submission entirely—rendering a **🛡️ Truss Proxy Unreachable** full-screen warning.
-* This guarantees that raw corporate prompts never accidentally "fail open" and bypass your policy checks when employees are off-network.
+If a remote employee is disconnected from the corporate VPN or network, the centralized or enclave proxy will become unreachable.
+* **Fail-Closed Behavior:** The extension will instantly intercept prompt attempts, detect that the proxy is unreachable, and block the submission entirely—rendering a **🛡️ Truss Proxy Unreachable** warning.
+* This guarantees that raw corporate prompts never accidentally bypass your policy checks when employees are off-network.
 
 ---
 
 ## Chrome Extension Distribution Methods
 
-Publishing the extension publicly on the consumer Chrome Web Store is **not required**. To deploy the extension securely across an organization, select one of the following official distribution patterns:
+To deploy the extension securely across an organization, select one of the following official distribution patterns:
 
 ### 1. Enterprise Force-Install (MDM Managed)
 For fully managed corporate environments, IT administrators can silently deploy and force-enable the extension via endpoint management tools (e.g., Jamf, Microsoft Intune, Google Workspace Admin Console, or Active Directory Group Policy).

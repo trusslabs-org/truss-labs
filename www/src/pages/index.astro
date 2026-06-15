@@ -7,10 +7,10 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 	<main class="pb-20 text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
 		<div class="mb-16 text-sm">
 			<p class="mb-4 text-dim">
-				Truss is a lightweight audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a hash-verifiable JSON receipt is written to disk.
+				Truss is an open-source audit proxy that lets enterprises safely use any AI model by sanitizing prompts at the browser edge and logging verified transaction receipts inside their own secure hardware enclaves.
 			</p>
 			<p class="text-dim">
-				The pitch: DLP-style visibility for AI activity on sensitive data, on infrastructure you control. No SaaS dependency; no third-party trust.
+				We help you bypass expensive, cloud-locked AI security suites. By intercepting data at the browser DOM or API gateway, Truss ensures sensitive data is redacted locally before it ever reaches public model providers. No SaaS middlemen; complete cryptographic sovereignty.
 			</p>
 		</div>
 
@@ -35,7 +35,7 @@ import 'asciinema-player/dist/bundle/asciinema-player.css';
 		</div>
 
 		<div class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Show me: process-level wrap</h2>
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Process-level wrap</h2>
 			<p class="text-dim text-sm leading-relaxed mb-4">
 				You don't need to rebuild your agents or modify their codebase. Truss wraps existing tools (like <code>gemini-cli</code>, in-house python pipelines, Cursor, or SDK-based agents) by pointing their client base-URLs at a local uvicorn proxy on your machine.
 			</p>
@@ -56,17 +56,32 @@ truss receipt verify ~/.truss/ledger/receipts</code></pre>
 			<p class="text-dim text-sm leading-relaxed pt-4">
 				Provider-agnostic by design — Gemini and Claude both wired today; OpenAI is the same reverse-proxy shape. Truss holds no upstream model credentials. The wrapped CLI's own API key (or OAuth token) flows through the inbound request and truss forwards it.
 			</p>
-			<p class="text-dim text-sm leading-relaxed pt-3">
-				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
+		</div>
+
+		<div class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Confidential enclave deployment</h2>
+			<p class="text-dim text-sm leading-relaxed mb-4">
+				For zero-trust enterprise security, the Truss proxy container is designed to compile directly into a bootable Enclave Image File (EIF). Running inside AWS Nitro Enclaves or GCP Confidential Space, the CPU encrypts memory at the hardware layer, shielding prompts in-flight even from root cloud administrators.
+			</p>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Compile the audit proxy to an AWS Nitro EIF
+nitro-cli build-enclave --docker-uri truss-audit-proxy:latest --output-file truss-proxy.eif
+
+# The physical CPU validates the image hash (PCR0)
+# Enclave pulls policy decryption keys from KMS only on successful hardware attestation</code></pre>
+			<p class="text-dim text-sm leading-relaxed pt-4">
+				By handling data scrubbing and immutable auditing inside an isolated, hardware-verified runtime, the underlying model is reduced to a stateless utility. You can hot-swap APIs or model providers in minutes without rewriting your security boundary.
 			</p>
 		</div>
 
 		<div class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Also: offline trace analysis</h2>
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Offline trace analysis</h2>
 			<p class="text-dim text-sm leading-relaxed">
 				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss trace translate</code> turns hooks.jsonl into traceable nodes, <code>truss trace analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
 			</p>
 			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
+			<p class="text-dim text-sm leading-relaxed pt-4">
+				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
+			</p>
 		</div>
 
 		<div class="pt-4">
