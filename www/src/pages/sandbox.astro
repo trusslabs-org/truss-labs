@@ -150,7 +150,7 @@ import Layout from '../layouts/Layout.astro';
 		<!-- Helpful Tip -->
 		<div class="max-w-4xl mx-auto text-center">
 			<p class="text-xs text-dim">
-				Tip: Real-world regular expressions can use modern Unicode lookarounds (e.g., <code>(?&lt;![\p&#123;L&#125;\p&#123;N&#125;])</code> and <code>(?![\p&#123;L&#125;\p&#123;N&#125;])</code> with the <code>u</code> flag) to support robust, multi-lingual boundaries across non-ASCII characters without security leaks.
+				<strong>Tip:</strong> Standard security filters often fail on non-English text because standard word boundaries only check English characters. Truss is designed with full Unicode awareness, ensuring that sensitive data in other languages (such as Spanish accents, French, or Cyrillic) cannot slip past your compliance filters.
 			</p>
 		</div>
 
