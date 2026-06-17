@@ -14,47 +14,65 @@ import Layout from '../layouts/Layout.astro';
 
 		<!-- Sandbox Layout Grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16">
-			<!-- Left column: Inputs (Rules & Prompt) -->
+			<!-- Left column: Inputs (Taxonomies, Policies, and Prompt) -->
 			<div class="lg:col-span-6 space-y-6">
-				<!-- Section 1: Interactive Policy Rules Customizer -->
-				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-4">
-					<div class="flex items-center justify-between">
-						<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">1. Local Compliance Rules (JSON)</h2>
+				<!-- Section 1: Interactive Configuration Split Editors -->
+				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-5">
+					<div class="flex items-center justify-between border-b border-border-dim pb-2">
+						<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">1. Local Config (Decoupled Model)</h2>
 						<span class="text-[10px] bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 rounded font-mono">Editable</span>
 					</div>
-					<p class="text-xs text-dim leading-relaxed">
-						Edit this array to add custom patterns. Precedence follows: <code>block</code> &gt; <code>redact</code> &gt; <code>allow</code>.
-					</p>
-					<textarea
-						id="rules-editor"
-						class="w-full h-[180px] bg-black/40 border border-border-dim rounded p-3 text-xs font-mono text-dim leading-relaxed focus:outline-none focus:border-accent"
-						spellcheck="false"
-					>{`[
+
+					<!-- 1a. Taxonomies (The Recognizers) -->
+					<div class="space-y-2">
+						<div class="flex justify-between items-center">
+							<span class="text-[10px] text-accent font-mono font-bold uppercase tracking-wider">1a. Taxonomies (The Recognizers)</span>
+						</div>
+						<p class="text-xs text-dim leading-relaxed">
+							Maps semantic classes (names, MRNs, patient addresses) to raw regular expressions. Security officers never see these.
+						</p>
+						<textarea
+							id="taxonomies-editor"
+							class="w-full h-[140px] bg-black/40 border border-border-dim rounded p-3 text-xs font-mono text-dim leading-relaxed focus:outline-none focus:border-accent"
+							spellcheck="false"
+						>{`{
+  "phi:patient_address": [
+    "\\\\b\\\\d{1,4}\\\\s+[A-Za-z0-9\\\\s]{3,20}\\\\s+(St|Street|Ave|Avenue|Rd|Road|Blvd|Lane|Way)\\\\b"
+  ],
+  "phi:date_of_birth": [
+    "\\\\b\\\\d{2}[-/]\\\\d{2}[-/]\\\\d{4}\\\\b",
+    "\\\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\\\s+\\\\d{1,2},\\\\s+\\\\d{4}\\\\b"
+  ]
+}`}</textarea>
+					</div>
+
+					<!-- 1b. Policies (The Compliance Rules) -->
+					<div class="space-y-2">
+						<div class="flex justify-between items-center">
+							<span class="text-[10px] text-accent font-mono font-bold uppercase tracking-wider">1b. Security Policies (The Rules)</span>
+						</div>
+						<p class="text-xs text-dim leading-relaxed">
+							Compliance-driven rules mapping actions directly to semantic taxonomy classes. No regular expressions are written here.
+						</p>
+						<textarea
+							id="policies-editor"
+							class="w-full h-[140px] bg-black/40 border border-border-dim rounded p-3 text-xs font-mono text-dim leading-relaxed focus:outline-none focus:border-accent"
+							spellcheck="false"
+						>{`[
   {
-    "id": "phi_block_address",
+    "id": "phi_block_address_rule",
     "action": "block",
-    "patterns": [
-      "\\\\b\\\\d{1,4}\\\\s+[A-Za-z0-9\\\\s]{3,20}\\\\s+(St|Street|Ave|Avenue|Rd|Road|Blvd|Lane|Way)\\\\b"
-    ],
+    "match_class": "phi:patient_address",
     "block_message": "Prompt blocked: Outbound prompt contains a physical home or patient address. Access blocked by PHI control rules."
   },
   {
-    "id": "phi_redact_dob",
+    "id": "phi_redact_dob_rule",
     "action": "redact",
-    "patterns": [
-      "\\\\b\\\\d{2}[-/]\\\\d{2}[-/]\\\\d{4}\\\\b",
-      "\\\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\\\s+\\\\d{1,2},\\\\s+\\\\d{4}\\\\b"
-    ],
+    "match_class": "phi:date_of_birth",
     "mask_token": "[REDACTED_DATE_OF_BIRTH]"
-  },
-  {
-    "id": "allow_generic_cases",
-    "action": "allow",
-    "patterns": [
-      "\\\\b(summarize|explain|translate|code|help)\\\\b"
-    ]
   }
 ]`}</textarea>
+					</div>
 					<div id="rules-status" class="text-[10px] text-accent font-mono h-4">Ready</div>
 				</div>
 
@@ -62,7 +80,7 @@ import Layout from '../layouts/Layout.astro';
 				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-4">
 					<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">2. Raw Outbound Prompt</h2>
 					<p class="text-xs text-dim leading-relaxed">
-						Type something containing an address or date of birth to trigger rules. Accented boundaries and modern Unicode expressions are fully supported.
+						Type something containing an address or date of birth to trigger rules.
 					</p>
 					<textarea
 						id="user-prompt"
@@ -156,14 +174,15 @@ import Layout from '../layouts/Layout.astro';
 
 		<!-- Unified Client-side Controller Script (Anti-State & Unicode-Safe) -->
 		<script>
-			// ─── 1. JSPolicyEngine Definition (Fixes Single-pass & Unicode bugs) ─────────
+			// ─── 1. JSPolicyEngine Definition (Fixes Single-pass, Unicode, & Taxonomy split) ──
 			class JSPolicyEngine {
-				constructor(policies = []) {
+				constructor(taxonomies = {}, policies = []) {
+					this.taxonomies = taxonomies;
 					this.policies = policies;
 				}
 
 				/**
-				 * Evaluate a prompt against rules in a single, state-safe regular expression pass.
+				 * Evaluate a prompt against decoupled rules in a single, state-safe regular expression pass.
 				 */
 				process(prompt) {
 					let processedPrompt = prompt;
@@ -177,8 +196,11 @@ import Layout from '../layouts/Layout.astro';
 					});
 
 					for (const policy of sortedPolicies) {
-						const { id, action, patterns, block_message, mask_token } = policy;
+						const { id, action, match_class, block_message, mask_token } = policy;
 						let matched = false;
+
+						// Resolve patterns from the matching taxonomy class
+						const patterns = this.taxonomies[match_class] || [];
 
 						for (const pattern of patterns) {
 							try {
@@ -186,7 +208,6 @@ import Layout from '../layouts/Layout.astro';
 								const regex = new RegExp(pattern, 'gui');
 								
 								// Single-Pass substitution callback: avoids test-then-replace lastIndex state bugs
-								const originalText = processedPrompt;
 								processedPrompt = processedPrompt.replace(regex, (match) => {
 									matched = true;
 									if (action === 'redact') {
@@ -208,7 +229,7 @@ import Layout from '../layouts/Layout.astro';
 									matchedRules.push(id);
 								}
 							} catch (e) {
-								console.error(`Regex compile error for pattern [${pattern}]:`, e);
+								console.error(`Regex compile error for pattern [${pattern}] under class [${match_class}]:`, e);
 							}
 						}
 					}
@@ -286,7 +307,8 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			// ─── 3. DOM Controller Wiring ───────────────────────────────────────────────
-			const rulesEditor = document.getElementById('rules-editor');
+			const taxonomiesEditor = document.getElementById('taxonomies-editor');
+			const policiesEditor = document.getElementById('policies-editor');
 			const rulesStatus = document.getElementById('rules-status');
 			const userPrompt = document.getElementById('user-prompt');
 			const verdictPill = document.getElementById('verdict-pill');
@@ -301,18 +323,27 @@ import Layout from '../layouts/Layout.astro';
 			const verifierIcon = document.getElementById('verifier-icon');
 			const verifierText = document.getElementById('verifier-text');
 
+			let loadedTaxonomies = {};
 			let loadedPolicies = [];
 			let lastSignedReceipt = null;
 
-			// Initialize and validate rules JSON
+			// Initialize and validate decoupled config JSONs
 			function reloadPolicies() {
 				try {
-					const parsed = JSON.parse(rulesEditor.value);
-					if (!Array.isArray(parsed)) {
-						throw new Error("Rules list must be a JSON array.");
+					const taxParsed = JSON.parse(taxonomiesEditor.value);
+					const polParsed = JSON.parse(policiesEditor.value);
+
+					if (typeof taxParsed !== 'object' || taxParsed === null || Array.isArray(taxParsed)) {
+						throw new Error("Taxonomies must be a JSON object mapping class names to pattern lists.");
 					}
-					loadedPolicies = parsed;
-					rulesStatus.textContent = "✓ Policies compiled and loaded";
+					if (!Array.isArray(polParsed)) {
+						throw new Error("Policies must be a JSON array of security rules.");
+					}
+
+					loadedTaxonomies = taxParsed;
+					loadedPolicies = polParsed;
+					
+					rulesStatus.textContent = "✓ Configurations parsed and loaded successfully";
 					rulesStatus.className = "text-[10px] text-accent font-mono";
 					evaluatePrompt();
 				} catch (err) {
@@ -325,7 +356,7 @@ import Layout from '../layouts/Layout.astro';
 			async function evaluatePrompt() {
 				if (loadedPolicies.length === 0) return;
 
-				const engine = new JSPolicyEngine(loadedPolicies);
+				const engine = new JSPolicyEngine(loadedTaxonomies, loadedPolicies);
 				const { verdict, processedPrompt, matchedRules } = engine.process(userPrompt.value);
 
 				// Update Verdict badge styles
@@ -426,7 +457,8 @@ import Layout from '../layouts/Layout.astro';
 			}
 
 			// Wire active Listeners
-			rulesEditor.addEventListener('input', reloadPolicies);
+			taxonomiesEditor.addEventListener('input', reloadPolicies);
+			policiesEditor.addEventListener('input', reloadPolicies);
 			userPrompt.addEventListener('input', evaluatePrompt);
 			btnVerifySig.addEventListener('click', verifyReceiptSignature);
 
