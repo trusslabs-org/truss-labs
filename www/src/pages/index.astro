@@ -164,10 +164,18 @@ nitro-cli build-enclave --docker-uri truss-audit-proxy:latest --output-file trus
 		<!-- Section: Offline Trace Analysis -->
 		<div class="pt-4 mb-16">
 			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Offline trace analysis</h2>
-			<p class="text-dim text-sm leading-relaxed">
-				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss trace translate</code> turns hooks.jsonl into traceable nodes, <code>truss trace analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
+			<p class="text-dim text-sm leading-relaxed mb-4">
+				Rather than locking you into a monolithic security suite, Truss handles post-incident analysis by treating security as a chain of small, composable command-line tools. Following the classic Unix philosophy of doing one thing well, each utility reads standard input, applies a single transform, and outputs structured JSON streams for the next command:
 			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
+			<ul class="list-disc pl-5 text-dim text-sm space-y-2 mb-6">
+				<li><code>truss trace translate</code> reads flat, raw agent logs (e.g., standard JSONL hooks) and parses them into a structured execution tree.</li>
+				<li><code>truss trace analyze</code> takes that tree and flags behavioral anomalies, such as tight model-retry loops or circular-reasoning stalls.</li>
+				<li><code>truss trap</code> scans the output stream in real-time and executes immediate countermeasures (like halting a runaway loop or raising a SIEM alert).</li>
+			</ul>
+			<p class="text-dim text-sm leading-relaxed mb-4">
+				By piping these utilities together using standard shell operators, you can construct highly flexible, auditable guardrail pipelines with zero runtime dependencies:
+			</p>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs leading-relaxed"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
 			<p class="text-dim text-sm leading-relaxed pt-4">
 				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
 			</p>
