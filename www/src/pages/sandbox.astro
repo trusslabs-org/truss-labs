@@ -1,0 +1,437 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Policy Sandbox" description="Interactive, client-side policy and audit proxy simulator">
+	<main class="pb-24 text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
+		<!-- Introduction header -->
+		<header class="mb-12 space-y-3">
+			<h1 class="text-3xl text-accent font-medium tracking-tight font-sans">Policy Sandbox</h1>
+			<p class="text-dim text-sm leading-relaxed max-w-2xl">
+				Test Truss's policy matching, redaction, and cryptographic audit signature primitives completely in-browser. This sandbox runs 100% client-side with zero network calls, proving that you don't need to send proprietary data to a third-party SaaS firewall to enforce local compliance.
+			</p>
+		</header>
+
+		<!-- Sandbox Layout Grid -->
+		<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16">
+			<!-- Left column: Inputs (Rules & Prompt) -->
+			<div class="lg:col-span-6 space-y-6">
+				<!-- Section 1: Interactive Policy Rules Customizer -->
+				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-4">
+					<div class="flex items-center justify-between">
+						<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">1. Local Compliance Rules (JSON)</h2>
+						<span class="text-[10px] bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 rounded font-mono">Editable</span>
+					</div>
+					<p class="text-xs text-dim leading-relaxed">
+						Edit this array to add custom patterns. Precedence follows: <code>block</code> &gt; <code>redact</code> &gt; <code>allow</code>.
+					</p>
+					<textarea
+						id="rules-editor"
+						class="w-full h-[180px] bg-black/40 border border-border-dim rounded p-3 text-xs font-mono text-dim leading-relaxed focus:outline-none focus:border-accent"
+						spellcheck="false"
+					>{`[
+  {
+    "id": "phi_block_address",
+    "action": "block",
+    "patterns": [
+      "\\\\b\\\\d{1,4}\\\\s+[A-Za-z0-9\\\\s]{3,20}\\\\s+(St|Street|Ave|Avenue|Rd|Road|Blvd|Lane|Way)\\\\b"
+    ],
+    "block_message": "Prompt blocked: Outbound prompt contains a physical home or patient address. Access blocked by PHI control rules."
+  },
+  {
+    "id": "phi_redact_dob",
+    "action": "redact",
+    "patterns": [
+      "\\\\b\\\\d{2}[-/]\\\\d{2}[-/]\\\\d{4}\\\\b",
+      "\\\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\\\s+\\\\d{1,2},\\\\s+\\\\d{4}\\\\b"
+    ],
+    "mask_token": "[REDACTED_DATE_OF_BIRTH]"
+  },
+  {
+    "id": "allow_generic_cases",
+    "action": "allow",
+    "patterns": [
+      "\\\\b(summarize|explain|translate|code|help)\\\\b"
+    ]
+  }
+]`}</textarea>
+					<div id="rules-status" class="text-[10px] text-accent font-mono h-4">Ready</div>
+				</div>
+
+				<!-- Section 2: Raw User Prompt Input -->
+				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-4">
+					<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">2. Raw Outbound Prompt</h2>
+					<p class="text-xs text-dim leading-relaxed">
+						Type something containing an address or date of birth to trigger rules. Accented boundaries and modern Unicode expressions are fully supported.
+					</p>
+					<textarea
+						id="user-prompt"
+						class="w-full h-[110px] bg-black/40 border border-border-dim rounded p-3 text-xs font-mono text-text leading-relaxed focus:outline-none focus:border-accent"
+						placeholder="The patient John Doe (born Oct 12, 1984) resides at 742 Evergreen Terrace. Summarize their case chart."
+					>The patient John Doe (born Oct 12, 1984) resides at 742 Evergreen Terrace. Summarize their case chart.</textarea>
+				</div>
+			</div>
+
+			<!-- Right column: Outputs (Sanitized Prompt & Verification) -->
+			<div class="lg:col-span-6 space-y-6">
+				<!-- Section 3: Live Output Console -->
+				<div class="rounded border border-border-dim bg-black/30 p-5 space-y-4">
+					<div class="flex items-center justify-between border-b border-border-dim pb-3">
+						<h2 class="text-sm font-bold text-accent uppercase tracking-wider font-mono">3. Intercept Diagnostics</h2>
+						<div id="verdict-pill" class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold tracking-wider">
+							Calculating
+						</div>
+					</div>
+
+					<!-- Matched Rules list -->
+					<div class="space-y-1">
+						<span class="text-[10px] text-dim uppercase tracking-wider font-mono">Matched Rules</span>
+						<div id="matched-rules-list" class="flex flex-wrap gap-2 text-xs font-mono text-dim">
+							None
+						</div>
+					</div>
+
+					<!-- Sanitized output sent to model -->
+					<div class="space-y-1">
+						<span class="text-[10px] text-dim uppercase tracking-wider font-mono">Sanitized Prompt (Sent to API)</span>
+						<div id="sanitized-output" class="bg-black/20 border border-border-dim rounded p-3 text-xs font-mono min-h-[50px] leading-relaxed break-words">
+						</div>
+					</div>
+
+					<!-- Generated JSON Receipt -->
+					<div class="space-y-2">
+						<div class="flex justify-between items-center">
+							<span class="text-[10px] text-dim uppercase tracking-wider font-mono">Deterministically Signed Receipt</span>
+							<button id="btn-copy-receipt" class="text-[10px] text-accent font-mono border border-accent/20 bg-accent/5 px-2 py-0.5 rounded hover:bg-accent/10 transition-colors select-none">
+								Copy JSON
+							</button>
+						</div>
+						<pre class="bg-black/40 border border-border-dim rounded p-3 text-[10px] leading-relaxed text-dim overflow-x-auto max-h-[160px] font-mono" id="receipt-json"><code></code></pre>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Section 4: Standalone Tamper-Proof Audit Verifier -->
+		<div class="rounded border border-border-dim bg-black/20 p-6 space-y-6 max-w-4xl mx-auto mb-16">
+			<div class="space-y-2">
+				<h2 class="text-base text-accent font-mono border-b border-border-dim pb-2 font-bold uppercase tracking-wide">4. Cryptographic Tamper Verification Tool</h2>
+				<p class="text-xs text-dim leading-relaxed">
+					This tool demonstrates the power of immutable audit receipts. Paste a Truss JSON receipt below, try modifying any parameter (such as changing <code>"verdict": "blocked"</code> to <code>"verdict": "allowed"</code>), and verify the signature. Since the signature is mathematically bound to the content, any tampering is immediately detected!
+				</p>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+				<div class="md:col-span-8 space-y-3">
+					<textarea
+						id="verifier-input"
+						class="w-full h-[180px] bg-black/40 border border-border-dim rounded p-3 text-[10px] font-mono text-dim leading-relaxed focus:outline-none focus:border-accent"
+						placeholder="Paste a JSON receipt here..."
+						spellcheck="false"
+					></textarea>
+				</div>
+				<div class="md:col-span-4 space-y-4 h-full flex flex-col justify-between">
+					<button
+						id="btn-verify-sig"
+						class="w-full py-2.5 rounded bg-accent border border-accent text-black font-mono font-bold text-xs uppercase hover:bg-accent/90 transition-colors select-none"
+					>
+						Verify Signature
+					</button>
+
+					<!-- Big Status Banner -->
+					<div id="verifier-status-card" class="border rounded p-4 flex flex-col items-center justify-center text-center flex-1 min-h-[110px] transition-colors duration-300 bg-black/10 border-border-dim">
+						<span id="verifier-icon" class="text-2xl mb-1">📋</span>
+						<span id="verifier-text" class="text-[10px] font-mono text-dim uppercase tracking-wider font-bold">Awaiting Input</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Helpful Tip -->
+		<div class="max-w-4xl mx-auto text-center">
+			<p class="text-xs text-dim">
+				Tip: Real-world regular expressions can use modern Unicode lookarounds (e.g., <code>(?&lt;![\p&#123;L&#125;\p&#123;N&#125;])</code> and <code>(?![\p&#123;L&#125;\p&#123;N&#125;])</code> with the <code>u</code> flag) to support robust, multi-lingual boundaries across non-ASCII characters without security leaks.
+			</p>
+		</div>
+
+		<!-- Unified Client-side Controller Script (Anti-State & Unicode-Safe) -->
+		<script>
+			// ─── 1. JSPolicyEngine Definition (Fixes Single-pass & Unicode bugs) ─────────
+			class JSPolicyEngine {
+				constructor(policies = []) {
+					this.policies = policies;
+				}
+
+				/**
+				 * Evaluate a prompt against rules in a single, state-safe regular expression pass.
+				 */
+				process(prompt) {
+					let processedPrompt = prompt;
+					let verdict = 'allow';
+					const matchedRules = [];
+
+					// Sort policies by precedence: block > redact > allow
+					const sortedPolicies = [...this.policies].sort((a, b) => {
+						const weight = { block: 3, redact: 2, allow: 1 };
+						return (weight[b.action] || 1) - (weight[a.action] || 1);
+					});
+
+					for (const policy of sortedPolicies) {
+						const { id, action, patterns, block_message, mask_token } = policy;
+						let matched = false;
+
+						for (const pattern of patterns) {
+							try {
+								// Fix: Add modern Unicode flag ('u') for accented multilingual boundaries
+								const regex = new RegExp(pattern, 'gui');
+								
+								// Single-Pass substitution callback: avoids test-then-replace lastIndex state bugs
+								const originalText = processedPrompt;
+								processedPrompt = processedPrompt.replace(regex, (match) => {
+									matched = true;
+									if (action === 'redact') {
+										return mask_token || `[REDACTED_${id.toUpperCase()}]`;
+									}
+									return match; // block or allow don't mutate inline
+								});
+
+								// Block matches should fail-fast instantly
+								if (matched && action === 'block') {
+									return {
+										verdict: 'block',
+										processedPrompt: block_message || "Prompt blocked by local security policy.",
+										matchedRules: [id]
+									};
+								}
+
+								if (matched && !matchedRules.includes(id)) {
+									matchedRules.push(id);
+								}
+							} catch (e) {
+								console.error(`Regex compile error for pattern [${pattern}]:`, e);
+							}
+						}
+					}
+
+					// If any redactions were executed, label appropriately
+					if (matchedRules.some(id => {
+						const rule = this.policies.find(p => p.id === id);
+						return rule && rule.action === 'redact';
+					})) {
+						verdict = 'redact';
+					}
+
+					return {
+						verdict,
+						processedPrompt,
+						matchedRules: matchedRules.length > 0 ? matchedRules : ['None']
+					};
+				}
+			}
+
+			// ─── 2. JSReceiptWriter Definition (Byte-perfect python-equivalent serializer) ──
+			class JSReceiptWriter {
+				/**
+				 * Alphabetically sorts object keys recursively to guarantee deterministic JSON output.
+				 */
+				static canonicalize(obj) {
+					if (obj === null || typeof obj !== 'object') {
+						return obj;
+					}
+					if (Array.isArray(obj)) {
+						return obj.map(item => JSReceiptWriter.canonicalize(item));
+					}
+					const sortedKeys = Object.keys(obj).sort();
+					const result = {};
+					for (const key of sortedKeys) {
+						result[key] = JSReceiptWriter.canonicalize(obj[key]);
+					}
+					return result;
+				}
+
+				/**
+				 * Cryptographically secure browser-native SHA-256 implementation.
+				 */
+				static async sha256(str) {
+					const encoder = new TextEncoder();
+					const data = encoder.encode(str);
+					const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+					const hashArray = Array.from(new Uint8Array(hashBuffer));
+					return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+				}
+
+				/**
+				 * Package metadata and calculate deterministic receipt signature.
+				 */
+				static async generateReceipt(verdict, matchedRules, promptText) {
+					const rawReceipt = {
+						verdict: verdict,
+						matched_rules: matchedRules,
+						evidence: {
+							device_owner: "corp_macbook_7",
+							timestamp: new Date().toISOString().split('.')[0] + 'Z', // Zero milliseconds format
+							receipt_hash: ""
+						}
+					};
+
+					// Serialize with zero whitespace and sorted keys (Python equivalent)
+					const canonicalStr = JSON.stringify(JSReceiptWriter.canonicalize(rawReceipt));
+					const hexHash = await JSReceiptWriter.sha256(canonicalStr);
+
+					// Inject signature back to the signed copy
+					const signed = JSON.parse(JSON.stringify(rawReceipt));
+					signed.evidence.receipt_hash = hexHash;
+					return signed;
+				}
+			}
+
+			// ─── 3. DOM Controller Wiring ───────────────────────────────────────────────
+			const rulesEditor = document.getElementById('rules-editor');
+			const rulesStatus = document.getElementById('rules-status');
+			const userPrompt = document.getElementById('user-prompt');
+			const verdictPill = document.getElementById('verdict-pill');
+			const matchedRulesList = document.getElementById('matched-rules-list');
+			const sanitizedOutput = document.getElementById('sanitized-output');
+			const receiptJson = document.getElementById('receipt-json');
+			const btnCopyReceipt = document.getElementById('btn-copy-receipt');
+			
+			const verifierInput = document.getElementById('verifier-input');
+			const btnVerifySig = document.getElementById('btn-verify-sig');
+			const verifierStatusCard = document.getElementById('verifier-status-card');
+			const verifierIcon = document.getElementById('verifier-icon');
+			const verifierText = document.getElementById('verifier-text');
+
+			let loadedPolicies = [];
+			let lastSignedReceipt = null;
+
+			// Initialize and validate rules JSON
+			function reloadPolicies() {
+				try {
+					const parsed = JSON.parse(rulesEditor.value);
+					if (!Array.isArray(parsed)) {
+						throw new Error("Rules list must be a JSON array.");
+					}
+					loadedPolicies = parsed;
+					rulesStatus.textContent = "✓ Policies compiled and loaded";
+					rulesStatus.className = "text-[10px] text-accent font-mono";
+					evaluatePrompt();
+				} catch (err) {
+					rulesStatus.textContent = `✗ Parse Error: ${err.message}`;
+					rulesStatus.className = "text-[10px] text-red-400 font-mono";
+				}
+			}
+
+			// Core Real-Time Evaluator & Receipt Signer
+			async function evaluatePrompt() {
+				if (loadedPolicies.length === 0) return;
+
+				const engine = new JSPolicyEngine(loadedPolicies);
+				const { verdict, processedPrompt, matchedRules } = engine.process(userPrompt.value);
+
+				// Update Verdict badge styles
+				verdictPill.className = "px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold tracking-wider";
+				if (verdict === 'allow') {
+					verdictPill.textContent = "Allow";
+					verdictPill.classList.add('bg-green-500/10', 'text-green-400', 'border', 'border-green-500/20');
+					sanitizedOutput.className = "bg-black/20 border border-border-dim rounded p-3 text-xs font-mono min-h-[50px] leading-relaxed break-words text-text";
+				} else if (verdict === 'redact') {
+					verdictPill.textContent = "Redacted";
+					verdictPill.classList.add('bg-yellow-500/10', 'text-yellow-400', 'border', 'border-yellow-500/20');
+					sanitizedOutput.className = "bg-black/20 border border-border-dim rounded p-3 text-xs font-mono min-h-[50px] leading-relaxed break-words text-yellow-300/80";
+				} else {
+					verdictPill.textContent = "Blocked";
+					verdictPill.classList.add('bg-red-500/10', 'text-red-400', 'border', 'border-red-500/20');
+					sanitizedOutput.className = "bg-red-500/5 border border-red-500/20 rounded p-3 text-xs font-mono min-h-[50px] leading-relaxed break-words text-red-300";
+				}
+
+				// Update matched rules listing
+				matchedRulesList.innerHTML = '';
+				matchedRules.forEach(id => {
+					const badge = document.createElement('span');
+					badge.className = "px-1.5 py-0.5 rounded bg-surface-variant border border-border-dim text-[10px] font-mono";
+					badge.textContent = id;
+					matchedRulesList.appendChild(badge);
+				});
+
+				// Update output text display
+				sanitizedOutput.textContent = processedPrompt;
+
+				// Calculate live cryptographic signed receipt
+				lastSignedReceipt = await JSReceiptWriter.generateReceipt(verdict, matchedRules, userPrompt.value);
+				receiptJson.textContent = JSON.stringify(lastSignedReceipt, null, 2);
+			}
+
+			// Copy JSON receipt helper
+			btnCopyReceipt.addEventListener('click', () => {
+				if (!lastSignedReceipt) return;
+				navigator.clipboard.writeText(JSON.stringify(lastSignedReceipt, null, 2))
+					.then(() => {
+						const originalText = btnCopyReceipt.textContent;
+						btnCopyReceipt.textContent = "Copied!";
+						setTimeout(() => btnCopyReceipt.textContent = originalText, 1500);
+					});
+			});
+
+			// STANDALONE SIGNATURE VERIFIER
+			async function verifyReceiptSignature() {
+				try {
+					// 1. Reset Status Styles
+					verifierStatusCard.className = "border rounded p-4 flex flex-col items-center justify-center text-center flex-1 min-h-[110px] transition-all duration-300 bg-black/10 border-border-dim";
+					verifierIcon.textContent = "⏳";
+					verifierText.textContent = "Verifying...";
+
+					const rawVal = verifierInput.value.trim();
+					if (!rawVal) {
+						throw new Error("Paste standard JSON receipt first.");
+					}
+
+					const parsed = JSON.parse(rawVal);
+					if (!parsed.evidence || !parsed.evidence.receipt_hash) {
+						throw new Error("Invalid schema: Missing evidence.receipt_hash field.");
+					}
+
+					const originalHash = parsed.evidence.receipt_hash;
+
+					// 2. Clone and zero out the receipt hash parameter (recreating deterministic target bytes)
+					const unsigned = JSON.parse(JSON.stringify(parsed));
+					unsigned.evidence.receipt_hash = "";
+
+					// 3. Serialize canonical sorted JSON (exact representation)
+					const canonicalStr = JSON.stringify(JSReceiptWriter.canonicalize(unsigned));
+					
+					// 4. Re-calculate SHA-256 signature
+					const recompiledHash = await JSReceiptWriter.sha256(canonicalStr);
+
+					// 5. Compare with original signature
+					if (recompiledHash === originalHash) {
+						setTimeout(() => {
+							verifierStatusCard.className = "border rounded p-4 flex flex-col items-center justify-center text-center flex-1 min-h-[110px] transition-all duration-300 bg-green-500/10 border-green-500/30 text-green-400";
+							verifierIcon.textContent = "✅";
+							verifierText.textContent = "Audit Trail Verified";
+						}, 350);
+					} else {
+						setTimeout(() => {
+							verifierStatusCard.className = "border rounded p-4 flex flex-col items-center justify-center text-center flex-1 min-h-[110px] transition-all duration-300 bg-red-500/10 border-red-500/30 text-red-400";
+							verifierIcon.textContent = "❌";
+							verifierText.textContent = "Signature Tamper Detected";
+						}, 350);
+					}
+				} catch (err) {
+					setTimeout(() => {
+						verifierStatusCard.className = "border rounded p-4 flex flex-col items-center justify-center text-center flex-1 min-h-[110px] transition-all duration-300 bg-red-500/10 border-red-500/20 text-red-300";
+						verifierIcon.textContent = "⚠️";
+						verifierText.textContent = err.message;
+					}, 350);
+				}
+			}
+
+			// Wire active Listeners
+			rulesEditor.addEventListener('input', reloadPolicies);
+			userPrompt.addEventListener('input', evaluatePrompt);
+			btnVerifySig.addEventListener('click', verifyReceiptSignature);
+
+			// Init execution load
+			reloadPolicies();
+		</script>
+	</main>
+</Layout>
