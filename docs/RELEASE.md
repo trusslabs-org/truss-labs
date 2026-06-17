@@ -12,7 +12,7 @@ unless they are verified as one release unit.
 - `www/public/demo/truss-primitives.tar.gz` — generic latest tarball.
 - `www/public/demo/truss-primitives-vX.Y.Z.tar.gz` — versioned tarball.
 - `www/src/pages/docs/index.astro` — CLI manual.
-- `examples/demo.html` — page served by `demo.trusslabs.org`.
+- `www/src/pages/sandbox.astro` — interactive browser sandbox.
 
 ## Canonical domains
 
@@ -20,7 +20,7 @@ The visible URLs should stay simple:
 
 - `https://trusslabs.org/` — canonical main site.
 - `https://trusslabs.org/docs/` — canonical docs.
-- `https://demo.trusslabs.org/` — canonical live demo.
+- `https://trusslabs.org/sandbox` — canonical interactive sandbox.
 
 Alias hostnames should redirect to the canonical URLs:
 
@@ -132,11 +132,10 @@ do
 done
 ```
 
-Check the demo VM:
+Check the sandbox:
 
 ```bash
-curl -fsSL https://demo.trusslabs.org/ | rg 'truss proxy exec'
-curl -fsSL https://demo.trusslabs.org/healthz
+curl -fsSL https://trusslabs.org/sandbox | grep -o "<title>[^<]*"
 ```
 
 Check docs routing:

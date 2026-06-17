@@ -2,7 +2,7 @@
 
 Truss is an audit and policy layer that sits in front of LLM and agent APIs. Every call gets a YAML policy applied (allow / block / redact), and a hash-verifiable JSON receipt is written to disk. The pitch: DLP-style visibility for AI activity on sensitive data, on infrastructure you control.
 
-**Live demo:** [demo.trusslabs.org](https://demo.trusslabs.org)
+**Live sandbox:** [trusslabs.org/sandbox](https://trusslabs.org/sandbox)
 **Site:** [trusslabs.org](https://trusslabs.org)
 
 ## What's in this repo
@@ -61,9 +61,11 @@ cat ~/.local/share/some-session/hooks.jsonl \
 
 A live recording: [trusslabs.org/demo/](https://trusslabs.org/) (asciinema embed under the "Show me" section).
 
-## Deploy
+## Sandbox
 
-The live demo at `demo.trusslabs.org` runs on a GCP VM behind a Cloudflare Tunnel. Full provisioning steps in [`examples/deploy/gcp/README.md`](examples/deploy/gcp/README.md). The VM has zero inbound ports open; traffic flows out through `cloudflared`.
+The interactive sandbox runs 100% client-side at [trusslabs.org/sandbox](https://trusslabs.org/sandbox).
+
+If you want to deploy the older server-side proxy architecture, the legacy GCP VM provisioning runbook is located in [`examples/deploy/gcp/README.md`](examples/deploy/gcp/README.md).
 
 ## License
 

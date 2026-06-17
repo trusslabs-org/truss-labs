@@ -33,7 +33,7 @@ Use these as the visible public URLs:
 
 - <https://trusslabs.org/> — main site
 - <https://trusslabs.org/docs/> — docs
-- <https://demo.trusslabs.org/> — live demo
+- <https://trusslabs.org/sandbox> — interactive policy sandbox
 
 Alias hostnames should redirect to canonical URLs:
 

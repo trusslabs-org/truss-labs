@@ -14,7 +14,7 @@ import Layout from '../../layouts/Layout.astro';
 		<section class="space-y-4">
 			<h2 class="text-xl text-accent border-b border-border-dim pb-2">Canonical domains</h2>
 			<p class="text-dim text-sm leading-relaxed">
-				The visible public URLs are <code>https://trusslabs.org/</code>, <code>https://trusslabs.org/docs/</code>, and <code>https://demo.trusslabs.org/</code>.
+				The visible public URLs are <code>https://trusslabs.org/</code>, <code>https://trusslabs.org/docs/</code>, and <code>https://trusslabs.org/sandbox</code>.
 			</p>
 			<p class="text-dim text-sm leading-relaxed">
 				Alias hostnames should redirect to those canonical URLs: <code>www.trusslabs.org/*</code> to <code>trusslabs.org/*</code>, and <code>docs.trusslabs.org/*</code> to <code>trusslabs.org/docs/*</code>. DNS can point a hostname to a service, but it cannot point a hostname to a path like <code>/docs/</code>; that path mapping has to be an HTTP redirect.
@@ -30,7 +30,7 @@ import Layout from '../../layouts/Layout.astro';
 				<li><code>www/public/demo/truss-primitives.tar.gz</code> — generic latest tarball.</li>
 				<li><code>www/public/demo/truss-primitives-vX.Y.Z.tar.gz</code> — versioned tarball.</li>
 				<li><code>www/src/pages/docs/index.astro</code> — CLI manual.</li>
-				<li><code>examples/demo.html</code> — page served by <code>demo.trusslabs.org</code>.</li>
+				<li><code>www/src/pages/sandbox.astro</code> — interactive browser sandbox.</li>
 			</ul>
 		</section>
 
@@ -75,11 +75,7 @@ cd www
 npm run build
 npx wrangler pages deploy dist --project-name truss-labs
 
-# demo.trusslabs.org
-# Re-run the GCP update flow in examples/deploy/gcp/README.md.</code></pre>
-			<p class="text-dim text-sm leading-relaxed">
-				The demo VM should serve <code>examples/demo.html</code> from the repo source, not a hand-edited copy.
-			</p>
+# no demo.trusslabs.org to deploy — the sandbox is statically built into the pages bundle above</code></pre>
 		</section>
 
 		<section class="space-y-4">
@@ -100,8 +96,7 @@ do
   rm -rf "$tmpdir"
 done
 
-curl -fsSL https://demo.trusslabs.org/ | rg 'truss proxy exec'
-curl -fsSL https://demo.trusslabs.org/healthz</code></pre>
+curl -fsSL https://trusslabs.org/sandbox | grep -o "<title>[^<]*"</code></pre>
 		</section>
 
 		<section class="space-y-4">
