@@ -6,46 +6,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../www/src/styles/tokens.css">
   <style>
-    /* ─── design tokens (mirrors www/src/styles/tokens.css §3) ─────── */
-    :root {
-      color-scheme: dark;
-
-      /* reference */
-      --ref-color-bg-0:        #0a0a0a;
-      --ref-color-bg-1:        #141414;
-      --ref-color-bg-2:        #1c1c1c;
-      --ref-color-text-0:      #e0e0e0;
-      --ref-color-text-1:      #888888;
-      --ref-color-text-2:      #555555;
-      --ref-color-outline:     rgba(255,255,255,0.10);
-      --ref-color-outline-strong: rgba(255,255,255,0.22);
-      --ref-color-accent:      #f96;
-      --ref-color-accent-dim:  #cc7a4d;
-      --ref-color-on-accent:   #1a0d00;
-      --ref-color-status-ok:   #4ade80;
-      --ref-color-status-warn: #fbbf24;
-      --ref-color-status-err:  #ef4444;
-      --ref-font-mono:         "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-      /* system */
-      --sys-color-bg:                  var(--ref-color-bg-0);
-      --sys-color-surface:             var(--ref-color-bg-1);
-      --sys-color-surface-variant:     var(--ref-color-bg-2);
-      --sys-color-text:                var(--ref-color-text-0);
-      --sys-color-text-dim:            var(--ref-color-text-1);
-      --sys-color-text-placeholder:    var(--ref-color-text-2);
-      --sys-color-outline:             var(--ref-color-outline);
-      --sys-color-outline-strong:      var(--ref-color-outline-strong);
-      --sys-color-accent:              var(--ref-color-accent);
-      --sys-color-on-accent:           var(--ref-color-on-accent);
-      --sys-color-accent-hover:        var(--ref-color-accent-dim);
-      --sys-color-status-allowed:      var(--ref-color-status-ok);
-      --sys-color-status-redacted:     var(--ref-color-status-warn);
-      --sys-color-status-blocked:      var(--ref-color-status-err);
-      --sys-font:                      var(--ref-font-mono);
-    }
-
     html, body { background: var(--sys-color-bg); color: var(--sys-color-text); }
     body { font-family: var(--sys-font);
            max-width: 760px; margin: 0 auto 2rem; padding: 0 1rem; line-height: 1.55;
@@ -163,6 +125,74 @@
                                    color: var(--sys-color-text-dim);
                                    margin-top: 0.6rem; word-break: break-all; }
 
+    .edge-demo { margin-top: 2rem; display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
+                 gap: 1rem; }
+    .edge-window { min-height: 340px; border: 1px solid var(--sys-color-outline);
+                   border-radius: 6px; background: rgba(0,0,0,0.35);
+                   overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+                   display: flex; flex-direction: column; }
+    .edge-window-bar { height: 44px; border-bottom: 1px solid var(--sys-color-outline);
+                       background: var(--sys-color-surface); display: flex;
+                       align-items: center; gap: 0.75rem; padding: 0 1rem; }
+    .edge-dots { display: flex; gap: 0.45rem; }
+    .edge-dot { width: 10px; height: 10px; border-radius: 50%;
+                background: var(--sys-color-outline-strong); }
+    .edge-address { margin-left: auto; margin-right: auto; min-width: 170px;
+                    max-width: 230px; border: 1px solid var(--sys-color-outline);
+                    border-radius: 5px; background: rgba(0,0,0,0.24);
+                    color: var(--sys-color-text-dim); display: flex;
+                    justify-content: center; align-items: center; gap: 0.45rem;
+                    padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+    .edge-address::before, .edge-status::before { content: ""; width: 7px; height: 7px;
+                                                  border-radius: 50%; background: var(--sys-color-accent);
+                                                  display: inline-block; }
+    .edge-status { border: 1px solid rgba(255,153,102,0.28); border-radius: 5px;
+                   background: rgba(255,153,102,0.05); color: var(--sys-color-accent);
+                   display: flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.75rem;
+                   font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .edge-status.blocked { color: var(--sys-color-status-blocked);
+                           border-color: rgba(239,68,68,0.28);
+                           background: rgba(239,68,68,0.05); }
+    .edge-status.blocked::before { background: var(--sys-color-status-blocked); }
+    .edge-chat { flex: 1; background: var(--sys-color-surface);
+                 padding: 1rem; display: flex; flex-direction: column; justify-content: flex-end; gap: 1rem; }
+    .edge-user { align-self: flex-end; max-width: 86%; }
+    .edge-label { color: var(--sys-color-text-dim); display: block; font-size: 0.7rem;
+                  text-align: right; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.35rem; }
+    .edge-bubble { border: 1px solid var(--sys-color-outline); border-radius: 5px;
+                   background: var(--sys-color-surface-variant); color: var(--sys-color-text-dim);
+                   padding: 0.7rem 0.8rem; }
+    .edge-alert { align-self: flex-start; max-width: 95%; border: 1px solid rgba(239,68,68,0.28);
+                  border-radius: 5px; background: rgba(239,68,68,0.05);
+                  color: var(--sys-color-status-blocked); padding: 0.75rem 0.85rem; }
+    .edge-alert strong { display: block; color: var(--sys-color-status-blocked); margin-bottom: 0.3rem; }
+    .edge-alert p { color: var(--sys-color-text-dim); margin: 0; font-size: 0.8rem; }
+    .edge-input-row { border-top: 1px solid var(--sys-color-outline);
+                      background: var(--sys-color-surface); display: flex; gap: 0.75rem;
+                      align-items: center; padding-top: 0.9rem; }
+    .edge-input { flex: 1; min-height: 38px; color: var(--sys-color-text-dim); }
+    .edge-cursor { display: inline-block; width: 7px; height: 18px;
+                   background: var(--sys-color-accent); vertical-align: -3px; }
+    .edge-send { margin: 0; background: var(--sys-color-surface-variant);
+                 border-color: var(--sys-color-outline); color: var(--sys-color-text-dim); }
+    .edge-ledger-body { flex: 1; background: var(--sys-color-surface);
+                        padding: 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+    .edge-success { color: var(--sys-color-text-dim); }
+    .edge-success strong { color: var(--sys-color-accent); }
+    .edge-receipt { flex: 1; min-height: 220px; margin: 0; background: rgba(0,0,0,0.2);
+                    border: 1px solid var(--sys-color-outline); border-radius: 5px;
+                    color: var(--sys-color-text-dim); padding: 0.8rem; overflow-x: auto; }
+    .edge-foot { margin-top: 0.7rem; display: flex; justify-content: space-between;
+                 gap: 1rem; color: var(--sys-color-text-dim); font-size: 0.8rem; }
+    .manual-demo { margin-top: 2.2rem; padding-top: 1.5rem; border-top: 1px solid var(--sys-color-outline); }
+    @media (max-width: 820px) {
+      .edge-demo { grid-template-columns: 1fr; }
+      .edge-foot { flex-direction: column; }
+      .edge-window { min-height: 300px; }
+      .edge-address { min-width: 0; }
+      .edge-status { display: none; }
+    }
+
     ::selection { background: var(--sys-color-accent); color: var(--sys-color-bg); }
   </style>
 </head>
@@ -172,27 +202,68 @@
     Receipts are deleted after 7 days.
   </div>
 
-  <h1>Truss Audit Proxy</h1>
-  <p>Truss sits between an agent and an LLM. Every call passes through a YAML policy that can allow, redact, or block — and every call writes a hash-verifiable receipt to disk. The receipt is what your auditor reads, not the chat log.</p>
-  <p class="sub">Flow: prompt → classifier → policy → LLM → receipt. The verdict and receipt path below are produced server-side from your YAML rules.</p>
+  <h1>Browser-edge audit demo</h1>
+  <p>Truss intercepts prompts at the browser edge before sensitive data leaves the user's machine. The policy decision and receipt are logged locally so an auditor can verify what happened without reading the chat transcript.</p>
+  <p class="sub">Flow: browser prompt → local policy check → block/redact/allow → compliance ledger receipt.</p>
 
-  <h2 style="margin-top:2rem;">See it in a real CLI session</h2>
-  <p class="sub">The 90-second cast below wraps <code>gemini-cli</code> with <code>truss proxy exec</code> and walks the full demo loop — block on patient address, redact on DOB, multi-turn followup, ledger verify. Provider-agnostic: <code>truss proxy exec -- claude</code> uses the same flow.</p>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/asciinema-player.css">
-  <div id="cast-player" style="margin: 1rem 0; border: 1px solid var(--sys-color-outline); border-radius: 4px; overflow: hidden;"></div>
-  <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/asciinema-player.min.js"></script>
-  <script>
-    if (window.AsciinemaPlayer) {
-      AsciinemaPlayer.create(
-        'https://trusslabs.org/demo/truss-exec-wrap.cast',
-        document.getElementById('cast-player'),
-        { autoPlay: true, loop: true, speed: 0.7, theme: 'asciinema', fit: 'width', controls: true }
-      );
-    }
-  </script>
+  <section class="edge-demo" aria-label="Simulated browser-edge intercept and local ledger">
+    <div>
+      <div class="edge-window">
+        <div class="edge-window-bar">
+          <div class="edge-dots" aria-hidden="true">
+            <span class="edge-dot"></span>
+            <span class="edge-dot"></span>
+            <span class="edge-dot"></span>
+          </div>
+          <div class="edge-address">chatgpt.com</div>
+          <div class="edge-status blocked">blocked</div>
+        </div>
+        <div class="edge-chat">
+          <div class="edge-user">
+            <span class="edge-label">User</span>
+            <div class="edge-bubble">Patient lives at 1234 Main St.<br>Summarize this note.</div>
+          </div>
+          <div class="edge-alert">
+            <strong>Truss Edge Interceptor</strong>
+            <p>PHI patient address detected in outbound browser request. Request aborted locally. No prompt was sent to the model provider.</p>
+          </div>
+          <div class="edge-input-row">
+            <div class="edge-input">Patient lives at 1234 Main St. Summarize this note.<span class="edge-cursor"></span></div>
+            <button class="edge-send" type="button">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="edge-window">
+        <div class="edge-window-bar">
+          <span class="meta">Local Compliance Ledger (~/.truss/ledger)</span>
+        </div>
+        <div class="edge-ledger-body">
+          <div class="edge-success"><strong>[SUCCESS]</strong> Written transaction receipt:</div>
+          <pre class="edge-receipt"><code>{
+  "verdict": "blocked",
+  "surface": "browser_edge",
+  "matched_rules": [
+    "phi_block_address"
+  ],
+  "evidence": {
+    "receipt_hash": "a4d3cf8e2c07...",
+    "device_owner": "corp_macbook_7"
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="edge-foot">
+    <span>Simulated browser-edge Manifest V3 intercept. Running locally.</span>
+    <span>Fail-Closed Mode: On</span>
+  </div>
 
-  <h2 style="margin-top:2rem;">Or try one turn yourself</h2>
-  <p class="sub">Single-turn HTTP form against the same proxy backend. Submit a prompt; see the verdict and the receipt that gets written to disk. For the multi-turn / swap-table demo, install the CLI (see homepage) and run <code>truss proxy exec -- gemini-cli</code> yourself.</p>
+  <section class="manual-demo">
+    <h2>Try the lower-level proxy endpoint</h2>
+    <p class="sub">The form below submits one request to the demo proxy and returns the raw verdict and receipt metadata. It is useful for checking policy behavior directly, underneath the browser-edge story.</p>
 
   <label for="endpoint">Proxy endpoint</label>
   <input id="endpoint" value="/v1/chat">
@@ -221,6 +292,7 @@
       <div class="receipt-path">written to: <span id="receipt"></span></div>
     </div>
   </div>
+  </section>
 
   <section class="explainer">
     <h2>How it works</h2>

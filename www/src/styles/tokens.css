@@ -3,36 +3,66 @@
  */
 
 :root {
-  /* Default: Obsidian Dark */
-  --sys-color-bg:                 #0a0a0a;
-  --sys-color-surface:            #141414;
-  --sys-color-surface-variant:    #1c1c1c;
-  --sys-color-text:               #e0e0e0;
-  --sys-color-text-dim:           #888888;
-  --sys-color-accent:             #ff9966; /* Peach Coral */
-  --sys-color-border:             rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
 
-  --sys-color-status-ok:          #4ade80;
-  --sys-color-status-warn:        #fbbf24;
-  --sys-color-status-err:         #ef4444;
+  /* reference: raw palette values */
+  --ref-color-bg-0:               #0a0a0a;
+  --ref-color-bg-1:               #141414;
+  --ref-color-bg-2:               #1c1c1c;
+  --ref-color-text-0:             #e0e0e0;
+  --ref-color-text-1:             #888888;
+  --ref-color-text-2:             #555555;
+  --ref-color-outline:            rgba(255, 255, 255, 0.10);
+  --ref-color-outline-strong:     rgba(255, 255, 255, 0.22);
+  --ref-color-accent:             #ff9966;
+  --ref-color-accent-dim:         #cc7a4d;
+  --ref-color-on-accent:          #1a0d00;
+  --ref-color-status-ok:          #4ade80;
+  --ref-color-status-warn:        #fbbf24;
+  --ref-color-status-err:         #ef4444;
+  --ref-font-mono:                "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* typography */
-  --sys-font-mono:                "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* system: semantic product roles */
+  --sys-color-bg:                 var(--ref-color-bg-0);
+  --sys-color-surface:            var(--ref-color-bg-1);
+  --sys-color-surface-variant:    var(--ref-color-bg-2);
+  --sys-color-text:               var(--ref-color-text-0);
+  --sys-color-text-dim:           var(--ref-color-text-1);
+  --sys-color-text-placeholder:   var(--ref-color-text-2);
+  --sys-color-outline:            var(--ref-color-outline);
+  --sys-color-outline-strong:     var(--ref-color-outline-strong);
+  --sys-color-border:             var(--sys-color-outline);
+  --sys-color-accent:             var(--ref-color-accent);
+  --sys-color-accent-hover:       var(--ref-color-accent-dim);
+  --sys-color-on-accent:          var(--ref-color-on-accent);
+  --sys-color-status-ok:          var(--ref-color-status-ok);
+  --sys-color-status-warn:        var(--ref-color-status-warn);
+  --sys-color-status-err:         var(--ref-color-status-err);
+  --sys-color-status-allowed:     var(--sys-color-status-ok);
+  --sys-color-status-redacted:    var(--sys-color-status-warn);
+  --sys-color-status-blocked:     var(--sys-color-status-err);
+  --sys-font-mono:                var(--ref-font-mono);
+  --sys-font:                     var(--sys-font-mono);
 }
 
 /* Paper-Light override — opt-in per route via <html data-theme="paper"> */
 :root[data-theme="paper"] {
-  --sys-color-bg:                 #fbfaf8;
-  --sys-color-surface:            #f3f2ee;
-  --sys-color-surface-variant:    #ebeae6;
-  --sys-color-text:               #1a1a1a;
-  --sys-color-text-dim:           #646462;
-  --sys-color-accent:             #c14d03; /* Rust / Terracotta */
-  --sys-color-border:             rgba(0, 0, 0, 0.08);
+  color-scheme: light;
 
-  --sys-color-status-ok:          #15803d;
-  --sys-color-status-warn:        #b45309;
-  --sys-color-status-err:         #b91c1c;
+  --ref-color-bg-0:               #fbfaf8;
+  --ref-color-bg-1:               #f3f2ee;
+  --ref-color-bg-2:               #ebeae6;
+  --ref-color-text-0:             #1a1a1a;
+  --ref-color-text-1:             #646462;
+  --ref-color-text-2:             #8a8883;
+  --ref-color-outline:            rgba(0, 0, 0, 0.08);
+  --ref-color-outline-strong:     rgba(0, 0, 0, 0.18);
+  --ref-color-accent:             #c14d03;
+  --ref-color-accent-dim:         #9f3f02;
+  --ref-color-on-accent:          #fffaf3;
+  --ref-color-status-ok:          #15803d;
+  --ref-color-status-warn:        #b45309;
+  --ref-color-status-err:         #b91c1c;
 }
 
 /* Tailwind 4 theme bridge — exposes sys tokens as utility namespaces
