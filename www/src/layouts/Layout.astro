@@ -58,10 +58,6 @@ const usePaperTheme = Astro.url.pathname.startsWith('/docs') || Astro.url.pathna
 			<slot />
 		</main>
 		<footer class="mt-24 pt-8 border-t border-border-dim text-dim text-xs flex flex-col md:flex-row justify-between gap-4">
-			<div class="flex items-center gap-2">
-				<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
-				System Status: Operational [Brooklyn, NY]
-			</div>
 			<div>&copy; {new Date().getFullYear()} Truss Labs Inc.</div>
 		</footer>
 	</body>
