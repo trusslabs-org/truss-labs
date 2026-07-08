@@ -257,7 +257,8 @@
         console.log("[Truss] Intercepted Gemini XHR request. Prompt:", promptText);
         sendToTruss("check-prompt", {
           text: promptText,
-          vendor: "gemini"
+          vendor: "gemini",
+          source: "xhr-hook"
         })
           .then(result => {
             console.log("[Truss] XHR Check Result:", result.verdict);
@@ -461,7 +462,8 @@
           const result = await sendToTruss("check-prompt", {
             text: promptText || null,
             body: bodyJson || null,
-            vendor: isChatGPT ? "chatgpt" : (isClaude ? "claude" : "gemini")
+            vendor: isChatGPT ? "chatgpt" : (isClaude ? "claude" : "gemini"),
+            source: "fetch-hook"
           });
 
           if (result.verdict === "blocked") {
@@ -622,7 +624,8 @@
                 if (finalResponseText) {
                   sendToTruss("check-response", {
                     text: finalResponseText,
-                    vendor: isChatGPT ? "chatgpt" : "claude"
+                    vendor: isChatGPT ? "chatgpt" : "claude",
+                    source: "stream-hook"
                   }).catch(err => console.error("Truss response audit error:", err));
                 }
                 controller.close();

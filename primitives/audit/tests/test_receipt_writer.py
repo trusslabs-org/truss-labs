@@ -222,6 +222,35 @@ class ReceiptWriterDefaults(unittest.TestCase):
     def test_schema_version_is_v1_1(self) -> None:
         self.assertEqual(SCHEMA_VERSION, "1.1")
 
+    def test_contextual_policy_block_validates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            writer = ReceiptWriter(receipts_dir=Path(tmp))
+            path = writer.write(
+                actor={"user_id": "alice"},
+                tool={"tool_id": "chatgpt-extension", "model_id": "chatgpt-web"},
+                prompt_text="DOB 1978-04-12",
+                response_text="",
+                contextual_policy={
+                    "session_id": "sess_test",
+                    "event_id": "evt_test",
+                    "event_type": "browser_prompt",
+                    "surface": "chrome_extension",
+                    "vendor": "chatgpt",
+                    "state_before_hash": "sha256:" + "0" * 64,
+                    "state_after_hash": "sha256:" + "1" * 64,
+                    "state_updates": [
+                        {
+                            "policy_id": "phi_browser_risk_score",
+                            "key": "risk_score",
+                            "op": "increment",
+                            "value": 20,
+                        }
+                    ],
+                },
+            )
+            receipt = json.loads(path.read_text())
+        self.assertEqual(receipt["contextual_policy"]["session_id"], "sess_test")
+
 
 class PolicyDecisionsV11(unittest.TestCase):
     """v1.1 policy_decisions[] contract per POLICY_ENGINE_SPEC v0.2."""

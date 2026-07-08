@@ -35,7 +35,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from .classifier import ClassHit, Classifier, Taxonomy
-from .policy_engine import PolicyEvaluation, evaluate
+from .policy_engine import PolicyEvaluation, evaluate, evaluate_event
+from .policy_event import PolicyEvent
 from .policy_loader import PolicyLoadError, load_policies
 
 
@@ -95,6 +96,12 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["external_vendor", "internal", "any"],
         default="external_vendor",
         help="Request destination tag (default: external_vendor).",
+    )
+    p.add_argument(
+        "--event-json",
+        type=Path,
+        default=None,
+        help="Path to a PolicyEvent JSON file for contextual dry-run.",
     )
     p.add_argument(
         "--json",
@@ -186,6 +193,7 @@ def _to_json_payload(evaluation: PolicyEvaluation) -> dict:
         "block_user_message": evaluation.block_user_message,
         "policy_set_version": evaluation.policy_set_version,
         "decisions": evaluation.receipt_payload(),
+        "state_updates": [u.to_receipt_dict() for u in evaluation.state_updates],
     }
 
 
@@ -199,10 +207,17 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     prompt = _resolve_text(args.prompt, args.prompt_file, "prompt")
     response = _resolve_text(args.response, args.response_file, "response")
-    if prompt is None and response is None:
+    event: Optional[PolicyEvent] = None
+    if args.event_json is not None:
+        if not args.event_json.exists():
+            raise SystemExit(f"--event-json not found: {args.event_json}")
+        event = PolicyEvent.model_validate(
+            json.loads(args.event_json.read_text(encoding="utf-8"))
+        )
+    if prompt is None and response is None and event is None:
         raise SystemExit(
             "must provide at least one of --prompt / --prompt-file / "
-            "--response / --response-file"
+            "--response / --response-file / --event-json"
         )
 
     try:
@@ -249,6 +264,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             output["phases"]["response"] = _to_json_payload(ev)
         else:
             _print_pretty(phase="response", text=response, evaluation=ev)
+
+    if event is not None:
+        hits = _classify_all(event.text, event.direction, args.taxonomy)
+        ev = evaluate_event(
+            event=event,
+            class_hits=hits,
+            policy_set=policy_set,
+        )
+        if args.as_json:
+            payload = _to_json_payload(ev)
+            payload["state_updates"] = [u.to_receipt_dict() for u in ev.state_updates]
+            output["phases"]["event"] = payload
+        else:
+            _print_pretty(phase=event.type, text=event.text, evaluation=ev)
 
     if args.as_json:
         json.dump(output, sys.stdout, indent=2)

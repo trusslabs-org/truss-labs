@@ -24,9 +24,12 @@ Design invariants:
 from __future__ import annotations
 
 import re
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .policy_event import PolicyEventType
+from .session_state import StateUpdate
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +37,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # ---------------------------------------------------------------------------
 
 
-POLICY_SCHEMA_VERSION = "1.0"
+POLICY_SCHEMA_VERSION = "1.1"
 
 # Closed grammar for redact_with templates in v0.1. Only {class} is supported.
 # Future tokens (e.g. {instance_index}, {policy_id}) are NOT parsed; literal
@@ -49,6 +52,18 @@ _POLICY_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,127}$")
 # Namespaced class names: "phi:patient_address", "pii:ssn", etc.
 # Namespace and local part both required, both snake-cased.
 _NAMESPACED_CLASS_RE = re.compile(r"^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$")
+_STATE_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]{0,127}$")
+_STATE_COMPARATORS = {
+    "eq",
+    "neq",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "contains",
+    "exists",
+    "missing",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +113,77 @@ class MatchClasses(BaseModel):
 class Match(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    direction: Literal["prompt", "response"]
+    direction: Literal["prompt", "response", "any"]
     destination: Literal["external_vendor", "internal", "any"]
     classes: MatchClasses
+
+
+# ---------------------------------------------------------------------------
+# Contextual policy blocks
+# ---------------------------------------------------------------------------
+
+
+class EventSelector(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    types: List[PolicyEventType]
+
+    @field_validator("types")
+    @classmethod
+    def _validate_types(cls, value: List[PolicyEventType]) -> List[PolicyEventType]:
+        if not value:
+            raise ValueError("event.types must contain at least one event type")
+        return value
+
+
+class StateCondition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: Optional[dict[str, Any]] = None
+    state_missing: Optional[List[str]] = None
+
+    @field_validator("state")
+    @classmethod
+    def _validate_state_keys(
+        cls, value: Optional[dict[str, Any]]
+    ) -> Optional[dict[str, Any]]:
+        if value is None:
+            return value
+        if not value:
+            raise ValueError("condition.state must contain at least one key")
+        for key, expected in value.items():
+            if not _STATE_KEY_RE.match(key):
+                raise ValueError(f"condition.state key {key!r} is not a valid state key")
+            if isinstance(expected, dict):
+                if not expected:
+                    raise ValueError(f"condition.state key {key!r} has empty comparator block")
+                unknown = set(expected) - _STATE_COMPARATORS
+                if unknown:
+                    raise ValueError(
+                        f"condition.state key {key!r} uses unsupported comparator(s): "
+                        f"{sorted(unknown)}"
+                    )
+        return value
+
+    @field_validator("state_missing")
+    @classmethod
+    def _validate_missing_keys(
+        cls, value: Optional[List[str]]
+    ) -> Optional[List[str]]:
+        if value is None:
+            return value
+        if not value:
+            raise ValueError("condition.state_missing must contain at least one key")
+        for key in value:
+            if not _STATE_KEY_RE.match(key):
+                raise ValueError(f"state_missing key {key!r} is not a valid state key")
+        return value
+
+    @model_validator(mode="after")
+    def _at_least_one_condition(self) -> "StateCondition":
+        if self.state is None and self.state_missing is None:
+            raise ValueError("condition must declare state or state_missing")
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -196,12 +279,15 @@ class Policy(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.0", "1.1"]
     policy_id: str
     policy_version: str = Field(..., min_length=1)
     description: Optional[str] = None
 
+    event: Optional[EventSelector] = None
     match: Match
+    condition: Optional[StateCondition] = None
+    state_updates: List[StateUpdate] = Field(default_factory=list)
     verdict: Literal["block", "redact", "alert"]
 
     block_config: Optional[BlockConfig] = None
@@ -210,6 +296,7 @@ class Policy(BaseModel):
 
     audit_only: bool = False
     on_classifier_error: Literal["fail_open", "fail_closed"] = "fail_open"
+    on_state_error: Literal["fail_open", "fail_closed"] = "fail_closed"
 
     @field_validator("policy_id")
     @classmethod
@@ -243,6 +330,15 @@ class Policy(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _contextual_fields_require_v11(self) -> "Policy":
+        if self.schema_version == "1.0":
+            if self.event is not None or self.condition is not None or self.state_updates:
+                raise ValueError(
+                    "event, condition, and state_updates require schema_version '1.1'"
+                )
+        return self
+
+    @model_validator(mode="after")
     def _redact_classes_are_subset(self) -> "Policy":
         if self.verdict != "redact" or self.redact_config is None:
             return self
@@ -264,6 +360,8 @@ __all__ = [
     "Policy",
     "Match",
     "MatchClasses",
+    "EventSelector",
+    "StateCondition",
     "BlockConfig",
     "RedactConfig",
     "AlertConfig",

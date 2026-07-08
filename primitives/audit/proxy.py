@@ -23,9 +23,11 @@ Tests can bypass env entirely via `create_app(...)` with explicit args + a stub 
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import secrets
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple
@@ -36,9 +38,11 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .classifier import ClassHit, Classifier, to_data_classes_touched
-from .policy_engine import PolicyEvaluation, evaluate
+from .policy_engine import PolicyEvaluation, evaluate, evaluate_event, evaluate_state_error
+from .policy_event import PolicyEvent, event_type_for_direction
 from .policy_loader import PolicyLoadError, PolicySet, load_policies
 from .receipt_writer import ReceiptWriter
+from .session_state import SessionStateError, SessionStateStore, StateTransition
 
 
 log = logging.getLogger("truss.audit.proxy")
@@ -140,11 +144,17 @@ class ChatResponse(BaseModel):
 
 
 class ExtensionCheckRequest(BaseModel):
+    session_id: Optional[str] = Field(default=None)
+    event_id: Optional[str] = Field(default=None)
     text: Optional[str] = Field(default=None)
     body: Optional[Dict[str, Any]] = Field(default=None)
     direction: str = Field("prompt")  # "prompt" or "response"
+    event_type: Optional[str] = Field(default=None)
     vendor: str = Field("chatgpt")  # "chatgpt" or "claude"
     user_id: str = Field("extension-user")
+    source: Optional[str] = Field(default=None)
+    page_url: Optional[str] = Field(default=None)
+    conversation_id: Optional[str] = Field(default=None)
 
 
 class ExtensionCheckResponse(BaseModel):
@@ -154,6 +164,7 @@ class ExtensionCheckResponse(BaseModel):
     receipt_path: Optional[str] = None
     mutated_body: Optional[Dict[str, Any]] = None
     mock_response: Optional[Dict[str, Any]] = None
+    session_state_hash: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +177,7 @@ def create_app(
     policy_set: PolicySet,
     classifiers: List[Classifier],
     receipts_dir: Path,
+    sessions_dir: Optional[Path] = None,
     llm_client: LLMClient,
     demo_html_path: Optional[Path] = None,
 ) -> FastAPI:
@@ -176,6 +188,9 @@ def create_app(
     in the same process.
     """
     writer = ReceiptWriter(receipts_dir=receipts_dir)
+    state_store = SessionStateStore(
+        sessions_dir if sessions_dir is not None else receipts_dir / "sessions"
+    )
     app = FastAPI(title="Truss Audit Proxy", version="0.1.0")
 
     # Permissive CORS so the bundled examples/demo.html works when opened
@@ -321,12 +336,68 @@ def create_app(
             text = req.text or ""
 
         hits = _classify_all(text, req.direction, classifiers)
-        evaluation = evaluate(
-            text=text,
-            direction=req.direction,
+        session_id = req.session_id or _default_extension_session_id(req)
+        event_type = req.event_type or event_type_for_direction(
+            req.direction, surface="chrome_extension"
+        )
+        metadata = {
+            "actor_id": req.user_id,
+            "surface": "chrome_extension",
+            "vendor": req.vendor,
+            "policy_set_version": policy_set.policy_set_version,
+        }
+        event_id = req.event_id or _generate_event_id()
+        event = PolicyEvent(
+            event_id=event_id,
+            session_id=session_id,
+            type=event_type,
+            surface="chrome_extension",
+            vendor=req.vendor,
+            actor=actor,
             destination="external_vendor",
-            class_hits=hits,
-            policy_set=policy_set,
+            data={
+                "text": text,
+                "url": req.page_url,
+                "source": req.source,
+                "conversation_id": req.conversation_id,
+            },
+            context={"policy_set_version": policy_set.policy_set_version},
+            session_state={},
+        )
+        state_error: Optional[str] = None
+        try:
+            state_record = state_store.get_or_create(session_id, metadata)
+            event = event.model_copy(
+                update={"session_state": state_record.state}
+            )
+            evaluation = evaluate_event(
+                event=event,
+                class_hits=hits,
+                policy_set=policy_set,
+            )
+            if evaluation.state_updates:
+                transition = state_store.apply_updates(
+                    session_id,
+                    evaluation.state_updates,
+                    event=event,
+                    metadata=metadata,
+                    context={"matched_classes": _matched_classes_from(evaluation)},
+                )
+            else:
+                transition = StateTransition.empty(state_record.state)
+        except SessionStateError as exc:
+            state_error = str(exc)
+            log.warning("session state error for %s: %s", session_id, exc)
+            evaluation = evaluate_state_error(
+                event=event,
+                class_hits=hits,
+                policy_set=policy_set,
+            )
+            transition = StateTransition.empty(event.session_state)
+        contextual_policy = _contextual_policy_payload(
+            event,
+            transition,
+            state_error=state_error,
         )
 
         receipt_path = None
@@ -340,6 +411,7 @@ def create_app(
                 prompt_hits=hits,
                 response_hits=[],
                 policy_evaluations=[evaluation],
+                contextual_policy=contextual_policy,
                 llm_meta=None,
                 retention_policy="default_seven_year",
                 retention_years=7,
@@ -356,6 +428,7 @@ def create_app(
                 prompt_hits=hits if req.direction == "prompt" else [],
                 response_hits=hits if req.direction == "response" else [],
                 policy_evaluations=[evaluation],
+                contextual_policy=contextual_policy,
                 llm_meta=None,
                 retention_policy="default_seven_year",
                 retention_years=7,
@@ -373,12 +446,13 @@ def create_app(
                 mutated_body = surface.redact_response(req.body, evaluation.mutated_text or text)
 
         return ExtensionCheckResponse(
-            verdict=evaluation.final_verdict,
+            verdict=_extension_verdict(evaluation.final_verdict),
             text=evaluation.mutated_text or text,
             block_message=evaluation.block_user_message,
             receipt_path=receipt_path,
             mutated_body=mutated_body,
             mock_response=mock_response,
+            session_state_hash=transition.after_hash,
         )
 
     return app
@@ -391,6 +465,9 @@ def create_app_from_env() -> FastAPI:
     ).expanduser()
     receipts_dir = Path(
         os.environ.get("TRUSS_RECEIPTS_DIR", "~/.truss/ledger/receipts")
+    ).expanduser()
+    sessions_dir = Path(
+        os.environ.get("TRUSS_SESSIONS_DIR", str(receipts_dir.parent / "sessions"))
     ).expanduser()
 
     raw_taxonomies = os.environ.get("TRUSS_TAXONOMIES", "")
@@ -422,6 +499,7 @@ def create_app_from_env() -> FastAPI:
         policy_set=policy_set,
         classifiers=classifiers,
         receipts_dir=receipts_dir,
+        sessions_dir=sessions_dir,
         llm_client=llm_client,
         demo_html_path=demo_html_path,
     )
@@ -569,6 +647,66 @@ def _classify_all(
     return hits
 
 
+def _generate_event_id() -> str:
+    timestamp = time.strftime("%Y-%m-%dT%H-%M-%SZ", time.gmtime())
+    return f"evt_{timestamp}_{secrets.token_hex(3)}"
+
+
+def _default_extension_session_id(req: ExtensionCheckRequest) -> str:
+    basis = "|".join(
+        [
+            req.user_id,
+            req.vendor,
+            req.conversation_id or "",
+            req.page_url or "",
+            req.source or "",
+        ]
+    )
+    digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+    return f"sess_extension_{digest}"
+
+
+def _matched_classes_from(evaluation: PolicyEvaluation) -> List[str]:
+    classes: List[str] = []
+    seen = set()
+    for decision in evaluation.decisions:
+        for cls in decision.matched_classes:
+            if cls not in seen:
+                seen.add(cls)
+                classes.append(cls)
+    return classes
+
+
+def _contextual_policy_payload(
+    event: PolicyEvent,
+    transition: StateTransition,
+    *,
+    state_error: Optional[str] = None,
+) -> Dict[str, Any]:
+    payload = {
+        "session_id": event.session_id,
+        "event_id": event.event_id,
+        "event_type": event.type,
+        "surface": event.surface,
+        "vendor": event.vendor,
+        "url": event.data.get("url"),
+        "source": event.data.get("source"),
+        "conversation_id": event.data.get("conversation_id"),
+        "state_before_hash": transition.before_hash,
+        "state_after_hash": transition.after_hash,
+        "state_updates": [u.to_receipt_dict() for u in transition.updates],
+    }
+    if state_error is not None:
+        payload["state_error"] = state_error
+    return payload
+
+
+def _extension_verdict(final_verdict: str) -> str:
+    if final_verdict == "alerted":
+        return "allowed"
+    return final_verdict
+
+
 def _write_receipt(
     *,
     writer: ReceiptWriter,
@@ -583,6 +721,7 @@ def _write_receipt(
     retention_policy: str,
     retention_years: int,
     retention_days: Optional[int],
+    contextual_policy: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Path, Dict[str, Any]]:
     data_classes = to_data_classes_touched(prompt_hits + response_hits)
     policy_decisions: List[Dict[str, Any]] = []
@@ -596,6 +735,7 @@ def _write_receipt(
         response_text=response_text,
         data_classes=data_classes,
         policy_decisions=policy_decisions,
+        contextual_policy=contextual_policy,
         retention_policy=retention_policy,
         retention_years=retention_years,
         retention_days=retention_days,

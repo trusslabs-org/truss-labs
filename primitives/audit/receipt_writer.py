@@ -79,6 +79,7 @@ class ReceiptWriter:
         context_references: Optional[List[Dict[str, Any]]] = None,
         downstream_actions: Optional[List[Dict[str, Any]]] = None,
         policy_decisions: Optional[List[Dict[str, Any]]] = None,
+        contextual_policy: Optional[Dict[str, Any]] = None,
         retention_policy: str = "default_seven_year",
         retention_years: int = 7,
         retention_days: Optional[int] = None,
@@ -99,6 +100,7 @@ class ReceiptWriter:
             context_references=context_references or [],
             downstream_actions=downstream_actions or [],
             policy_decisions=policy_decisions or [],
+            contextual_policy=contextual_policy,
             retention_policy=retention_policy,
             retention_years=retention_years,
             retention_days=retention_days,
@@ -128,6 +130,7 @@ class ReceiptWriter:
         context_references: List[Dict[str, Any]],
         downstream_actions: List[Dict[str, Any]],
         policy_decisions: List[Dict[str, Any]],
+        contextual_policy: Optional[Dict[str, Any]],
         retention_policy: str,
         retention_years: int,
         retention_days: Optional[int],
@@ -182,6 +185,8 @@ class ReceiptWriter:
                 "legal_hold": legal_hold,
             },
         }
+        if contextual_policy is not None:
+            receipt["contextual_policy"] = dict(contextual_policy)
 
         # Hash the receipt with evidence.receipt_hash zeroed out so the hash is
         # stable and verifiable: an auditor reproduces the hash by zeroing the

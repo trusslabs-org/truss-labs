@@ -1,0 +1,24 @@
+schema_version: "1.1"
+policy_id: phi_browser_block_when_risky
+policy_version: v1.0
+description: Block browser prompts with PHI after session risk accumulates.
+event:
+  types:
+    - browser_prompt
+condition:
+  state:
+    risk_score:
+      gte: 40
+match:
+  direction: prompt
+  destination: external_vendor
+  classes:
+    any_of:
+      - phi:patient_name
+      - phi:patient_dob
+verdict: block
+block_config:
+  user_message: "This browser session has accumulated sensitive-data risk. External prompt blocked."
+audit_only: false
+on_classifier_error: fail_open
+on_state_error: fail_closed

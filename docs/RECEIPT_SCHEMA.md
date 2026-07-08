@@ -116,6 +116,7 @@ Every model call routed through the Truss audit-proxy produces one JSON receipt 
 | `data_classes_touched` | array | yes | Classifier output: which sensitive-data classes appeared and where. |
 | `downstream_actions` | array | yes | Side effects that followed (file writes, API calls, etc.). |
 | `policy_decisions` | array | yes | Per-policy verdicts that ran against this interaction. |
+| `contextual_policy` | object | no | Session/event state evidence for contextual policy decisions. |
 | `evidence` | object | yes | Hash + capture metadata for integrity verification. |
 | `retention` | object | yes | Retention/legal-hold metadata for lifecycle management. |
 
@@ -153,6 +154,13 @@ One entry per policy that evaluated this interaction. Per `POLICY_ENGINE_SPEC v0
 - `redactions_applied[]` — each entry: `location` (`"prompt"` | `"response"`), `before_hash`, `after_hash`.
 - `error_reason` — closed enum, null unless `enforcement_mode == error`: `classifier_timeout | classifier_exception | taxonomy_load_error | policy_eval_exception`.
 - `alert_id` — null unless `verdict == alerted`. When present: `{id, delivery_status: "pending"|"delivered"|"failed", delivered_at: ISO-8601 | null}`.
+
+### `contextual_policy`
+Present when a request was evaluated as a contextual policy event.
+- `session_id`, `event_id`, `event_type`, `surface`, `vendor`, `url`, `source`, and `conversation_id` identify the evaluated browser event.
+- `state_before_hash` and `state_after_hash` are SHA-256 hashes of the session state before and after applying policy updates.
+- `state_updates[]` records ordered updates emitted by matched policies, including `policy_id`, `key`, `op`, and the literal or event-derived value metadata.
+- `state_error` is present only when state loading or mutation failed and the policy decision was evaluated through `on_state_error`.
 
 ### `evidence`
 - `receipt_hash` — SHA-256 over the canonicalized JSON body, computed with this field zeroed. An auditor reproduces the hash by:
