@@ -25,8 +25,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 from .classifier import ClassHit
+from .policy_event import PolicyEvent
 from .policy_loader import PolicySet
 from .policy_schema import Policy
+from .session_state import StateUpdate
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +96,7 @@ class PolicyEvaluation:
     mutated_text: Optional[str]  # None when blocked
     block_user_message: Optional[str]  # set when final_verdict == "blocked"
     policy_set_version: str
+    state_updates: Tuple[StateUpdate, ...] = ()
 
     def receipt_payload(self) -> List[Dict[str, Any]]:
         """Convenience wrapper for receipt_writer.write(policy_decisions=...)."""
@@ -125,7 +128,7 @@ def evaluate(
     *,
     now: Optional[Callable[[], datetime]] = None,
 ) -> PolicyEvaluation:
-    """Evaluate one phase against the loaded PolicySet.
+    """Evaluate one legacy prompt/response phase against the loaded PolicySet.
 
     Args:
       text: The prompt or response text. The engine returns a possibly-mutated
@@ -139,14 +142,48 @@ def evaluate(
         When set, class_hits is ignored.
       now: Optional clock injection for tests. Defaults to datetime.now(UTC).
     """
+    event = PolicyEvent(
+        event_id="legacy_event",
+        session_id="legacy_session",
+        type=direction,
+        surface="legacy",
+        actor={},
+        destination=destination,
+        data={"text": text},
+        context={"policy_set_version": policy_set.policy_set_version},
+        session_state={},
+    )
+    return evaluate_event(
+        event=event,
+        class_hits=class_hits,
+        policy_set=policy_set,
+        classifier_error=classifier_error,
+        now=now,
+    )
+
+
+def evaluate_event(
+    *,
+    event: PolicyEvent,
+    class_hits: List[ClassHit],
+    policy_set: PolicySet,
+    classifier_error: Optional[_ErrorReasonT] = None,
+    now: Optional[Callable[[], datetime]] = None,
+) -> PolicyEvaluation:
+    """Evaluate one normalized policy event against the loaded PolicySet."""
     clock = now or (lambda: datetime.now(timezone.utc))
     evaluated_at = _iso8601(clock())
+    text = event.text
+    direction = event.direction
 
     # Filter to policies whose direction+destination match this phase.
     eligible = [
         p
         for p in policy_set.policies
-        if _direction_matches(p, direction) and _destination_matches(p, destination)
+        if _event_matches(p, event)
+        and _direction_matches(p, direction)
+        and _destination_matches(p, event.destination)
+        and _state_condition_matches(p, event.session_state)
     ]
 
     if classifier_error is not None:
@@ -161,12 +198,95 @@ def evaluate(
     return _evaluate_happy_path(
         text=text,
         direction=direction,
+        event=event,
         eligible=eligible,
         class_hits=class_hits,
         policy_set_version=policy_set.policy_set_version,
         evaluated_at=evaluated_at,
         clock=clock,
         block_lookup=_block_lookup_from(eligible),
+    )
+
+
+def evaluate_state_error(
+    *,
+    event: PolicyEvent,
+    class_hits: List[ClassHit],
+    policy_set: PolicySet,
+    now: Optional[Callable[[], datetime]] = None,
+) -> PolicyEvaluation:
+    """Evaluate fail-open/fail-closed behavior when session state is unavailable."""
+    clock = now or (lambda: datetime.now(timezone.utc))
+    evaluated_at = _iso8601(clock())
+    direction = event.direction
+    direction_hits = [h for h in class_hits if h.location == direction]
+    hit_classes_set = {h.cls for h in direction_hits}
+    stateful = [
+        p
+        for p in policy_set.policies
+        if (p.event is not None or p.condition is not None or p.state_updates)
+        and _event_matches(p, event)
+        and _direction_matches(p, direction)
+        and _destination_matches(p, event.destination)
+    ]
+
+    decisions: List[PolicyDecision] = []
+    block_user_message: Optional[str] = None
+    for policy in sorted(stateful, key=lambda p: p.policy_id):
+        matched_classes = _match_classes(policy, hit_classes_set)
+        if matched_classes is None:
+            continue
+        if policy.on_state_error == "fail_open":
+            verdict = "allowed"
+            would_have_blocked = False
+        else:
+            verdict = "blocked"
+            would_have_blocked = True
+            if block_user_message is None and policy.block_config is not None:
+                block_user_message = policy.block_config.user_message
+        decisions.append(
+            PolicyDecision(
+                policy_id=policy.policy_id,
+                policy_version=policy.policy_version,
+                policy_set_version=policy_set.policy_set_version,
+                evaluated_at=evaluated_at,
+                verdict=verdict,
+                enforcement_mode="error",
+                matched_classes=tuple(matched_classes),
+                would_have_blocked=would_have_blocked,
+                redactions_applied=(),
+                error_reason="policy_eval_exception",
+                alert_id=None,
+            )
+        )
+
+    if not decisions:
+        decisions.append(
+            PolicyDecision(
+                policy_id=None,
+                policy_version=None,
+                policy_set_version=policy_set.policy_set_version,
+                evaluated_at=evaluated_at,
+                verdict="allowed",
+                enforcement_mode="error",
+                matched_classes=(),
+                would_have_blocked=False,
+                redactions_applied=(),
+                error_reason="policy_eval_exception",
+                alert_id=None,
+            )
+        )
+
+    final_verdict = _highest_precedence(d.verdict for d in decisions)
+    if final_verdict == "blocked" and block_user_message is None:
+        block_user_message = "Request blocked: session state unavailable and policy is fail-closed."
+    return PolicyEvaluation(
+        decisions=tuple(_sort_decisions(decisions)),
+        final_verdict=final_verdict,
+        mutated_text=None if final_verdict == "blocked" else event.text,
+        block_user_message=block_user_message,
+        policy_set_version=policy_set.policy_set_version,
+        state_updates=(),
     )
 
 
@@ -188,6 +308,7 @@ def _evaluate_happy_path(
     *,
     text: str,
     direction: _DirectionT,
+    event: PolicyEvent,
     eligible: List[Policy],
     class_hits: List[ClassHit],
     policy_set_version: str,
@@ -202,6 +323,7 @@ def _evaluate_happy_path(
 
     decisions: List[PolicyDecision] = []
     redact_ops: List[_RedactOp] = []  # collected for mutation pass
+    state_updates: List[StateUpdate] = []
 
     for policy in eligible:
         matched_classes = _match_classes(policy, hit_classes_set)
@@ -248,6 +370,13 @@ def _evaluate_happy_path(
                 alert_id=alert_id,
             )
         )
+        if enforcement_mode == "enforced":
+            for update in policy.state_updates:
+                state_updates.append(
+                    update.model_copy(
+                        update={"policy_id": update.policy_id or policy.policy_id}
+                    )
+                )
 
     if not decisions:
         # Synthetic "allowed" — one entry per phase per spec.
@@ -258,6 +387,7 @@ def _evaluate_happy_path(
         direction=direction,
         decisions=decisions,
         redact_ops=redact_ops,
+        state_updates=state_updates,
         policy_set_version=policy_set_version,
         block_lookup=block_lookup,
     )
@@ -342,6 +472,7 @@ def _evaluate_error_path(
         mutated_text=mutated_text,
         block_user_message=block_user_message,
         policy_set_version=policy_set_version,
+        state_updates=(),
     )
 
 
@@ -356,6 +487,7 @@ def _resolve_and_finalize(
     direction: _DirectionT,
     decisions: List[PolicyDecision],
     redact_ops: List["_RedactOp"],
+    state_updates: List[StateUpdate],
     policy_set_version: str,
     block_lookup: Dict[str, str],
 ) -> PolicyEvaluation:
@@ -406,6 +538,7 @@ def _resolve_and_finalize(
         mutated_text=mutated_text,
         block_user_message=block_user_message,
         policy_set_version=policy_set_version,
+        state_updates=tuple(state_updates),
     )
 
 
@@ -454,7 +587,7 @@ def _match_classes(policy: Policy, hit_classes: set) -> Optional[List[str]]:
 
 
 def _direction_matches(policy: Policy, request_direction: str) -> bool:
-    return policy.match.direction == request_direction
+    return policy.match.direction == "any" or policy.match.direction == request_direction
 
 
 def _destination_matches(policy: Policy, request_destination: str) -> bool:
@@ -462,6 +595,85 @@ def _destination_matches(policy: Policy, request_destination: str) -> bool:
         policy.match.destination == "any"
         or policy.match.destination == request_destination
     )
+
+
+def _event_matches(policy: Policy, event: PolicyEvent) -> bool:
+    if policy.event is None:
+        if policy.match.direction == "prompt":
+            return event.type in {"prompt", "browser_prompt"}
+        if policy.match.direction == "response":
+            return event.type in {"response", "browser_response"}
+        return True
+    return event.type in set(policy.event.types)
+
+
+def _state_condition_matches(policy: Policy, state: dict[str, Any]) -> bool:
+    condition = policy.condition
+    if condition is None:
+        return True
+    for key in condition.state_missing or []:
+        if key in state:
+            return False
+    for key, expected in (condition.state or {}).items():
+        if not _state_value_matches(state, key, expected):
+            return False
+    return True
+
+
+def _state_value_matches(state: dict[str, Any], key: str, expected: Any) -> bool:
+    exists = key in state
+    actual = state.get(key)
+    if not isinstance(expected, dict):
+        return exists and actual == expected
+    for comparator, operand in expected.items():
+        if comparator == "exists":
+            if bool(operand) != exists:
+                return False
+            continue
+        if comparator == "missing":
+            if bool(operand) != (not exists):
+                return False
+            continue
+        if not exists:
+            return False
+        if comparator == "eq" and actual != operand:
+            return False
+        if comparator == "neq" and actual == operand:
+            return False
+        if comparator == "gt" and not _compare(actual, operand, lambda a, b: a > b):
+            return False
+        if comparator == "gte" and not _compare(actual, operand, lambda a, b: a >= b):
+            return False
+        if comparator == "lt" and not _compare(actual, operand, lambda a, b: a < b):
+            return False
+        if comparator == "lte" and not _compare(actual, operand, lambda a, b: a <= b):
+            return False
+        if comparator == "contains":
+            try:
+                if operand not in actual:
+                    return False
+            except TypeError:
+                return False
+        if comparator not in {
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "contains",
+            "exists",
+            "missing",
+        }:
+            return False
+    return True
+
+
+def _compare(actual: Any, operand: Any, fn: Callable[[Any, Any], bool]) -> bool:
+    try:
+        return bool(fn(actual, operand))
+    except TypeError:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -614,4 +826,5 @@ __all__ = [
     "PolicyDecision",
     "PolicyEvaluation",
     "evaluate",
+    "evaluate_event",
 ]

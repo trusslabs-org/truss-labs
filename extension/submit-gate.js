@@ -37,6 +37,73 @@
   let inFlight = false;
   const seenSynth = new WeakSet();
 
+  function trussUuid() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    return `id-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function conversationIdFromUrl() {
+    const match = window.location.pathname.match(/\/c\/([^/?#]+)/);
+    if (match) return match[1];
+    const claudeMatch = window.location.pathname.match(/\/chat\/([^/?#]+)/);
+    if (claudeMatch) return claudeMatch[1];
+    return null;
+  }
+
+  function safeIdPart(value) {
+    return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").slice(0, 120);
+  }
+
+  function getPageSessionId() {
+    const currentConversation = document.documentElement.dataset.trussConversationId;
+    if (!document.documentElement.dataset.trussSessionId || currentConversation) {
+      const origin = safeIdPart(window.location.origin);
+      document.documentElement.dataset.trussSessionId = `sess_${vendor}_${origin}_${trussUuid()}`;
+      delete document.documentElement.dataset.trussConversationId;
+      document.documentElement.dataset.trussSessionPending = "true";
+    }
+    return document.documentElement.dataset.trussSessionId;
+  }
+
+  function getStoredConversationSession(conversationId) {
+    try {
+      return window.localStorage.getItem(`truss:session:${vendor}:${conversationId}`);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function storeConversationSession(conversationId, sessionId) {
+    try {
+      window.localStorage.setItem(`truss:session:${vendor}:${conversationId}`, sessionId);
+    } catch (_) {
+      // Ignore storage failures; the request still carries the in-page session.
+    }
+  }
+
+  function getSessionId(conversationId) {
+    if (conversationId) {
+      const stored = getStoredConversationSession(conversationId);
+      if (stored) {
+        document.documentElement.dataset.trussSessionId = stored;
+        document.documentElement.dataset.trussConversationId = conversationId;
+        delete document.documentElement.dataset.trussSessionPending;
+        return stored;
+      }
+      const existing = document.documentElement.dataset.trussSessionId;
+      const existingConversation = document.documentElement.dataset.trussConversationId;
+      const pending = document.documentElement.dataset.trussSessionPending === "true";
+      const canAdopt = existing && (pending || !existingConversation);
+      const sessionId = canAdopt ? existing : `sess_${vendor}_${safeIdPart(conversationId)}`;
+      document.documentElement.dataset.trussSessionId = sessionId;
+      document.documentElement.dataset.trussConversationId = conversationId;
+      delete document.documentElement.dataset.trussSessionPending;
+      storeConversationSession(conversationId, sessionId);
+      return sessionId;
+    }
+    return getPageSessionId();
+  }
+
   function getComposerText() {
     const el = document.querySelector(sel.composer);
     if (!el) return { el: null, text: "" };
@@ -117,15 +184,21 @@
   }
 
   async function checkWithProxy(text) {
+    const conversationId = conversationIdFromUrl();
     const resp = await fetch("http://localhost:8000/v1/extension/check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        session_id: getSessionId(conversationId),
+        event_id: `evt_${trussUuid()}`,
         text,
         direction: "prompt",
+        event_type: "browser_prompt",
         vendor,
         user_id: "extension-user",
-        source: "submit-gate"
+        source: "submit-gate",
+        page_url: window.location.href,
+        conversation_id: conversationId
       })
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

@@ -128,6 +128,29 @@ class HappyPath(unittest.TestCase):
         p = Policy.model_validate(payload)
         self.assertEqual(p.on_classifier_error, "fail_open")
 
+    def test_contextual_v11_policy_validates(self) -> None:
+        payload = {
+            **ALERT_POLICY,
+            "schema_version": "1.1",
+            "policy_id": "phi_browser_risk_score",
+            "event": {"types": ["browser_prompt"]},
+            "match": {
+                "direction": "prompt",
+                "destination": "external_vendor",
+                "classes": {"any_of": ["phi:patient_dob"]},
+            },
+            "condition": {"state": {"risk_score": {"lt": 50}}},
+            "state_updates": [
+                {"key": "risk_score", "op": "increment", "value": 20},
+                {"key": "has_seen_phi", "op": "set", "value": True},
+            ],
+            "alert_config": {},
+        }
+        p = Policy.model_validate(payload)
+        self.assertEqual(p.schema_version, "1.1")
+        self.assertEqual(p.event.types, ["browser_prompt"])
+        self.assertEqual(len(p.state_updates), 2)
+
 
 # ---------------------------------------------------------------------------
 # Verdict ↔ config block discrimination
@@ -338,6 +361,26 @@ class SchemaVersionValidation(unittest.TestCase):
     def test_extra_top_level_field_rejected(self) -> None:
         # extra='forbid' on Policy means unknown YAML keys hard-fail at parse.
         payload = {**BLOCK_POLICY, "future_feature": "bool_compose"}
+        with self.assertRaises(ValidationError):
+            Policy.model_validate(payload)
+
+    def test_contextual_fields_on_v10_rejected(self) -> None:
+        payload = {
+            **BLOCK_POLICY,
+            "event": {"types": ["browser_prompt"]},
+        }
+        with self.assertRaises(ValidationError):
+            Policy.model_validate(payload)
+
+    def test_unknown_state_comparator_rejected(self) -> None:
+        payload = {
+            **ALERT_POLICY,
+            "schema_version": "1.1",
+            "policy_id": "phi_browser_bad_condition",
+            "event": {"types": ["browser_prompt"]},
+            "condition": {"state": {"risk_score": {"around": 40}}},
+            "alert_config": {},
+        }
         with self.assertRaises(ValidationError):
             Policy.model_validate(payload)
 

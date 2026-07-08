@@ -10,7 +10,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from audit.classifier import ClassHit  # noqa: E402
-from audit.policy_engine import PolicyEvaluation, evaluate  # noqa: E402
+from audit.policy_engine import (  # noqa: E402
+    PolicyEvaluation,
+    evaluate,
+    evaluate_event,
+    evaluate_state_error,
+)
+from audit.policy_event import PolicyEvent  # noqa: E402
 from audit.policy_loader import PolicySet  # noqa: E402
 from audit.policy_schema import (  # noqa: E402
     AlertConfig,
@@ -112,6 +118,61 @@ def make_set(*policies: Policy, version: str = "abc123def456") -> PolicySet:
         policies=tuple(policies),
         policy_set_version=version,
         source_dir=None,
+    )
+
+
+def contextual_risk_policy() -> Policy:
+    return Policy.model_validate(
+        {
+            "schema_version": "1.1",
+            "policy_id": "phi_browser_risk_score",
+            "policy_version": "v1.0",
+            "event": {"types": ["browser_prompt"]},
+            "match": {
+                "direction": "prompt",
+                "destination": "external_vendor",
+                "classes": {"any_of": ["phi:patient_dob"]},
+            },
+            "state_updates": [
+                {"key": "risk_score", "op": "increment", "value": 20},
+            ],
+            "verdict": "alert",
+            "alert_config": {},
+        }
+    )
+
+
+def contextual_block_policy() -> Policy:
+    return Policy.model_validate(
+        {
+            "schema_version": "1.1",
+            "policy_id": "phi_browser_block_when_risky",
+            "policy_version": "v1.0",
+            "event": {"types": ["browser_prompt"]},
+            "condition": {"state": {"risk_score": {"gte": 40}}},
+            "match": {
+                "direction": "prompt",
+                "destination": "external_vendor",
+                "classes": {"any_of": ["phi:patient_dob"]},
+            },
+            "verdict": "block",
+            "block_config": {"user_message": "risky"},
+        }
+    )
+
+
+def browser_event(state=None) -> PolicyEvent:
+    return PolicyEvent(
+        event_id="evt_test",
+        session_id="sess_test",
+        type="browser_prompt",
+        surface="chrome_extension",
+        vendor="chatgpt",
+        actor={"user_id": "alice@example.com"},
+        destination="external_vendor",
+        data={"text": "DOB 1978-04-12"},
+        context={"policy_set_version": "abc123def456"},
+        session_state=state or {},
     )
 
 
@@ -375,6 +436,60 @@ class AlertPath(unittest.TestCase):
         self.assertIsNotNone(d.alert_id)
         self.assertEqual(d.alert_id["delivery_status"], "pending")
         self.assertIsNone(d.alert_id["delivered_at"])
+
+
+class ContextualPolicies(unittest.TestCase):
+    def test_event_policy_emits_state_updates(self) -> None:
+        ev = evaluate_event(
+            event=browser_event(),
+            class_hits=[hit("phi:patient_dob", 0, 14, "prompt", "DOB 1978-04-12")],
+            policy_set=make_set(contextual_risk_policy()),
+            now=fixed_clock(),
+        )
+        self.assertEqual(ev.final_verdict, "alerted")
+        self.assertEqual(len(ev.state_updates), 1)
+        self.assertEqual(ev.state_updates[0].key, "risk_score")
+
+    def test_audit_only_event_policy_does_not_emit_state_updates(self) -> None:
+        policy = contextual_risk_policy().model_copy(update={"audit_only": True})
+        ev = evaluate_event(
+            event=browser_event(),
+            class_hits=[hit("phi:patient_dob", 0, 14, "prompt", "DOB 1978-04-12")],
+            policy_set=make_set(policy),
+            now=fixed_clock(),
+        )
+        self.assertEqual(ev.final_verdict, "allowed")
+        self.assertEqual(ev.decisions[0].enforcement_mode, "audit_only")
+        self.assertEqual(ev.state_updates, ())
+
+    def test_state_error_uses_policy_fail_closed(self) -> None:
+        ev = evaluate_state_error(
+            event=browser_event(),
+            class_hits=[hit("phi:patient_dob", 0, 14, "prompt", "DOB 1978-04-12")],
+            policy_set=make_set(contextual_block_policy()),
+            now=fixed_clock(),
+        )
+        self.assertEqual(ev.final_verdict, "blocked")
+        self.assertEqual(ev.decisions[0].enforcement_mode, "error")
+        self.assertEqual(ev.decisions[0].error_reason, "policy_eval_exception")
+
+    def test_state_condition_gates_block(self) -> None:
+        ps = make_set(contextual_risk_policy(), contextual_block_policy())
+        low = evaluate_event(
+            event=browser_event({"risk_score": 20}),
+            class_hits=[hit("phi:patient_dob", 0, 14, "prompt", "DOB 1978-04-12")],
+            policy_set=ps,
+            now=fixed_clock(),
+        )
+        self.assertEqual(low.final_verdict, "alerted")
+        high = evaluate_event(
+            event=browser_event({"risk_score": 40}),
+            class_hits=[hit("phi:patient_dob", 0, 14, "prompt", "DOB 1978-04-12")],
+            policy_set=ps,
+            now=fixed_clock(),
+        )
+        self.assertEqual(high.final_verdict, "blocked")
+        self.assertEqual(high.block_user_message, "risky")
 
 
 # ---------------------------------------------------------------------------

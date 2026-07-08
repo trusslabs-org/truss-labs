@@ -223,7 +223,7 @@ class Healthz(ProxyBase):
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertEqual(body["status"], "ok")
-        self.assertEqual(body["policy_count"], 2)
+        self.assertEqual(body["policy_count"], 4)
         self.assertNotEqual(body["policy_set_version"], "empty")
         self.assertEqual(body["model_id"], "stub-echo")
 
@@ -284,6 +284,86 @@ class ExtensionCheckRoute(ProxyBase):
         self.assertEqual(body["verdict"], "blocked")
         self.assertIn("Patient address detected", body["block_message"])
         self.assertIsNotNone(body["receipt_path"])
+
+    def test_browser_risk_accumulates_and_blocks(self) -> None:
+        session_id = "sess_test_contextual"
+        payload = {
+            "session_id": session_id,
+            "direction": "prompt",
+            "event_type": "browser_prompt",
+            "vendor": "chatgpt",
+            "user_id": "test-user",
+            "source": "pytest",
+            "page_url": "https://chatgpt.com/c/demo",
+            "text": "Patient DOB 1978-04-12.",
+        }
+
+        first = self.client.post(
+            "/v1/extension/check",
+            json={**payload, "event_id": "evt_one"},
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()["verdict"], "allowed")
+        first_receipt = self._read_receipt(first.json()["receipt_path"])
+        self.assertEqual(first_receipt["contextual_policy"]["session_id"], session_id)
+        self.assertEqual(
+            first_receipt["contextual_policy"]["url"],
+            "https://chatgpt.com/c/demo",
+        )
+        self.assertEqual(first_receipt["contextual_policy"]["source"], "pytest")
+        self.assertEqual(
+            first_receipt["contextual_policy"]["state_updates"][0]["key"],
+            "risk_score",
+        )
+
+        second = self.client.post(
+            "/v1/extension/check",
+            json={**payload, "event_id": "evt_two"},
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()["verdict"], "allowed")
+
+        third = self.client.post(
+            "/v1/extension/check",
+            json={**payload, "event_id": "evt_three"},
+        )
+        self.assertEqual(third.status_code, 200)
+        self.assertEqual(third.json()["verdict"], "blocked")
+        self.assertIn("accumulated sensitive-data risk", third.json()["block_message"])
+
+    def test_state_error_writes_error_decision_receipt(self) -> None:
+        session_id = "sess_state_error"
+        payload = {
+            "session_id": session_id,
+            "direction": "prompt",
+            "event_type": "browser_prompt",
+            "vendor": "chatgpt",
+            "user_id": "test-user",
+            "text": "Patient DOB 1978-04-12.",
+        }
+        first = self.client.post(
+            "/v1/extension/check",
+            json={**payload, "event_id": "evt_before_corrupt"},
+        )
+        self.assertEqual(first.status_code, 200)
+        state_path = self.receipts_dir / "sessions" / f"{session_id}.json"
+        data = json.loads(state_path.read_text())
+        data["state"]["risk_score"] = "not numeric"
+        state_path.write_text(json.dumps(data), encoding="utf-8")
+
+        second = self.client.post(
+            "/v1/extension/check",
+            json={**payload, "event_id": "evt_after_corrupt"},
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()["verdict"], "blocked")
+        receipt = self._read_receipt(second.json()["receipt_path"])
+        self.assertIn("state_error", receipt["contextual_policy"])
+        error_decisions = [
+            d for d in receipt["policy_decisions"] if d["enforcement_mode"] == "error"
+        ]
+        self.assertTrue(error_decisions)
+        self.assertEqual(error_decisions[0]["error_reason"], "policy_eval_exception")
 
 
 class ChatGPTCompletionsRoute(ProxyBase):

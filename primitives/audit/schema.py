@@ -137,6 +137,18 @@ class Retention(TypedDict, total=False):
     legal_hold: bool
 
 
+class ContextualPolicyEvidence(TypedDict, total=False):
+    session_id: str
+    event_id: str
+    event_type: str
+    surface: str
+    vendor: Optional[str]
+    state_before_hash: str
+    state_after_hash: str
+    state_updates: List[Dict[str, Any]]
+    approval: Optional[Dict[str, Any]]
+
+
 class Receipt(TypedDict, total=False):
     schema_version: str
     receipt_id: str
@@ -149,6 +161,7 @@ class Receipt(TypedDict, total=False):
     data_classes_touched: List[DataClassTouched]
     downstream_actions: List[DownstreamAction]
     policy_decisions: List[PolicyDecision]
+    contextual_policy: ContextualPolicyEvidence
     evidence: Evidence
     retention: Retention
 
@@ -342,6 +355,47 @@ RECEIPT_JSON_SCHEMA = {
                         ],
                     },
                 },
+            },
+        },
+        "contextual_policy": {
+            "type": "object",
+            "required": [
+                "session_id",
+                "event_id",
+                "event_type",
+                "surface",
+                "state_before_hash",
+                "state_after_hash",
+                "state_updates",
+            ],
+            "properties": {
+                "session_id": {"type": "string"},
+                "event_id": {"type": "string"},
+                "event_type": {"type": "string"},
+                "surface": {"type": "string"},
+                "vendor": {"type": ["string", "null"]},
+                "url": {"type": ["string", "null"]},
+                "source": {"type": ["string", "null"]},
+                "conversation_id": {"type": ["string", "null"]},
+                "state_before_hash": {"type": "string", "pattern": r"^sha256:[0-9a-f]{64}$"},
+                "state_after_hash": {"type": "string", "pattern": r"^sha256:[0-9a-f]{64}$"},
+                "state_error": {"type": "string"},
+                "state_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["key", "op"],
+                        "properties": {
+                            "policy_id": {"type": ["string", "null"]},
+                            "key": {"type": "string"},
+                            "op": {"type": "string"},
+                            "value": {},
+                            "path": {"type": "string"},
+                            "value_from_event": {"type": "string"},
+                        },
+                    },
+                },
+                "approval": {"type": ["object", "null"]},
             },
         },
         "evidence": {

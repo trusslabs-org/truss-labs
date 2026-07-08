@@ -1,0 +1,27 @@
+schema_version: "1.1"
+policy_id: phi_browser_risk_score
+policy_version: v1.0
+description: Increase browser-session risk when PHI appears in prompts.
+event:
+  types:
+    - browser_prompt
+match:
+  direction: prompt
+  destination: external_vendor
+  classes:
+    any_of:
+      - phi:patient_name
+      - phi:patient_dob
+state_updates:
+  - key: risk_score
+    op: increment
+    value: 20
+  - key: has_seen_phi
+    op: set
+    value: true
+verdict: alert
+alert_config:
+  webhook: null
+audit_only: false
+on_classifier_error: fail_open
+on_state_error: fail_closed

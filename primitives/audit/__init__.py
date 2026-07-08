@@ -8,6 +8,8 @@ branch agent reasoning.
 
 from .schema import Receipt, RECEIPT_JSON_SCHEMA, SCHEMA_VERSION
 from .receipt_writer import ReceiptWriter
+from .policy_event import PolicyEvent
+from .session_state import SessionStateStore, StateUpdate
 from .classifier import (
     ClassHit,
     Classifier,
@@ -19,6 +21,9 @@ from .classifier import (
 __all__ = [
     "Receipt",
     "ReceiptWriter",
+    "PolicyEvent",
+    "SessionStateStore",
+    "StateUpdate",
     "RECEIPT_JSON_SCHEMA",
     "SCHEMA_VERSION",
     "ClassHit",
