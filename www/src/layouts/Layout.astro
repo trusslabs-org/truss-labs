@@ -4,7 +4,7 @@ interface Props {
 	description?: string;
 }
 
-const { title, description = "AI activity visibility on infrastructure you control" } = Astro.props;
+const { title, description = "Browser-edge governance for AI activity on infrastructure you control" } = Astro.props;
 const usePaperTheme = Astro.url.pathname.startsWith('/docs') || Astro.url.pathname.startsWith('/blog');
 ---
 
@@ -45,7 +45,7 @@ const usePaperTheme = Astro.url.pathname.startsWith('/docs') || Astro.url.pathna
 				<h1 class="text-2xl text-accent font-bold tracking-tight whitespace-nowrap shrink-0">
 					<a href="/" class="hover:no-underline text-accent">Truss Labs Inc.</a>
 				</h1>
-				<span class="text-dim text-sm truncate">AI activity visibility on infrastructure you control</span>
+				<span class="text-dim text-sm truncate">Browser-edge governance on infrastructure you control</span>
 			</div>
 			<nav class="flex gap-6 text-sm shrink-0">
 				<a href="/blog">Blog</a>

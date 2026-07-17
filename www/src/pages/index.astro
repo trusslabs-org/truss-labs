@@ -1,112 +1,153 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import 'asciinema-player/dist/bundle/asciinema-player.css';
 ---
 
-<Layout title="Truss Labs">
+<Layout
+	title="Truss Labs"
+	description="Browser-edge governance for ChatGPT, Claude, Gemini, and other web AI clients."
+>
 	<main class="pb-20 text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
-		<div class="mb-16 text-sm">
+		<section class="mb-16 text-sm">
 			<p class="mb-4 text-dim">
-				Truss is an open-source audit proxy that lets enterprises safely use any AI model by sanitizing prompts at the browser edge and logging verified transaction receipts inside their own secure hardware enclaves.
+				Truss is an open-source browser governance layer for teams using public AI tools. The Chrome extension hooks ChatGPT, Claude, and Gemini in the browser, checks each prompt against local YAML policies, and blocks or redacts sensitive data before the request leaves the employee's machine.
 			</p>
 			<p class="text-dim">
-				We help you bypass expensive, cloud-locked AI security suites. By intercepting data at the browser DOM or API gateway, Truss ensures sensitive data is redacted locally before it ever reaches public model providers. No SaaS middlemen; complete cryptographic sovereignty.
+				The proxy still exists, but it is now infrastructure rather than the headline. The product surface is the browser edge: real-time policy enforcement, fail-closed behavior when the proxy is unavailable, and hash-verifiable receipts written to infrastructure you control.
 			</p>
-		</div>
+		</section>
 
-		<div class="mb-16">
-			<div class="relative w-full rounded border border-border-dim bg-black/40 overflow-hidden shadow-2xl mb-6">
+		<section class="mb-16" aria-labelledby="browser-demo-heading">
+			<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<h2 id="browser-demo-heading" class="text-dim border-l-2 border-accent pl-4 mb-2">Browser-edge demo</h2>
+					<p class="text-dim text-xs">Primary recording target: Chrome extension intercepting ChatGPT, Claude, or Gemini.</p>
+				</div>
+				<a href="/demo/truss-exec-wrap.mp4" download class="text-dim text-xs underline hover:text-text transition-colors">Legacy proxy MP4</a>
+			</div>
+
+			<div class="rounded border border-border-dim bg-black/40 overflow-hidden shadow-2xl">
 				<div class="flex items-center gap-2 px-4 py-3 border-b border-border-dim bg-surface">
-					<div class="flex gap-1.5">
+					<div class="flex gap-1.5" aria-hidden="true">
 						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 						<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
 					</div>
-					<span class="text-xs text-dim font-mono select-none pl-4">demo.trusslabs.org</span>
+					<span class="text-xs text-dim font-mono select-none pl-4">chatgpt.com</span>
+					<span class="ml-auto text-xs text-accent font-mono">Truss Audit Layer: active</span>
 				</div>
-				<div class="p-4 bg-surface font-mono">
-					<div id="asciinema-demo"></div>
-				</div>
-			</div>
-			<div class="flex justify-between items-center px-1">
-				<span class="text-dim text-xs select-none">Recorded 2026-05-18 (53.5s take).</span>
-				<a href="/demo/truss-exec-wrap.mp4" download class="text-dim text-xs underline hover:text-text transition-colors">Download MP4 (9.4 MB)</a>
-			</div>
-		</div>
 
-		<div class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Process-level wrap</h2>
+				<div class="grid gap-0 md:grid-cols-[1.5fr_1fr]">
+					<div class="bg-surface p-4 md:p-6">
+						<div class="rounded border border-border-dim bg-bg p-4 min-h-[320px] flex flex-col gap-4">
+							<div class="flex items-start gap-3">
+								<div class="w-8 h-8 rounded-full bg-surface-variant shrink-0"></div>
+								<div class="flex-1">
+									<div class="mb-2 h-3 w-24 rounded bg-surface-variant"></div>
+									<div class="rounded border border-border-dim bg-surface p-3 text-sm text-dim">
+										Patient lives at <span class="text-text">1234 Main St.</span> Summarize their case.
+									</div>
+								</div>
+							</div>
+
+							<div class="mt-auto rounded border border-[rgba(239,68,68,0.45)] bg-[rgba(239,68,68,0.08)] p-4">
+								<div class="flex items-center justify-between gap-3 mb-3">
+									<span class="text-sm text-text font-bold">Policy decision: blocked</span>
+									<span class="text-xs text-[var(--sys-color-status-err)] font-mono">before_send</span>
+								</div>
+								<p class="text-xs text-dim">
+									PHI address matched local policy. Request did not leave the browser. Receipt committed to the local ledger.
+								</p>
+							</div>
+						</div>
+					</div>
+
+					<aside class="border-t md:border-t-0 md:border-l border-border-dim bg-bg p-4 md:p-6">
+						<div class="text-xs text-dim uppercase tracking-normal mb-4">Extension path</div>
+						<ol class="space-y-4 text-sm">
+							<li class="flex gap-3">
+								<span class="text-accent font-bold">01</span>
+								<span>Injected fetch hook captures the prompt inside ChatGPT, Claude, or Gemini.</span>
+							</li>
+							<li class="flex gap-3">
+								<span class="text-accent font-bold">02</span>
+								<span>Isolated content script checks <code>localhost:8000/v1/extension/check</code>, bypassing page CSP.</span>
+							</li>
+							<li class="flex gap-3">
+								<span class="text-accent font-bold">03</span>
+								<span>Policy returns <code>block</code>, <code>redact</code>, or <code>allow</code>; the page updates in place.</span>
+							</li>
+							<li class="flex gap-3">
+								<span class="text-accent font-bold">04</span>
+								<span>Every decision writes a hash-verifiable receipt for audit review.</span>
+							</li>
+						</ol>
+					</aside>
+				</div>
+			</div>
+
+			<div class="flex flex-col gap-2 px-1 pt-4 text-xs text-dim sm:flex-row sm:justify-between">
+				<span>Current homepage visual updated for the browser-extension pivot.</span>
+				<span>Next capture should show block, redact, and fail-closed flows.</span>
+			</div>
+		</section>
+
+		<section class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">What ships in the extension</h2>
+			<div class="grid gap-4 md:grid-cols-3">
+				<div class="border border-border-dim bg-surface p-4">
+					<h3 class="text-sm text-text mb-3">Prompt interception</h3>
+					<p class="text-dim text-xs leading-relaxed">
+						The extension hooks web AI clients directly, so policy checks happen at the user interaction layer rather than after data has already reached a model provider.
+					</p>
+				</div>
+				<div class="border border-border-dim bg-surface p-4">
+					<h3 class="text-sm text-text mb-3">Local enforcement</h3>
+					<p class="text-dim text-xs leading-relaxed">
+						Teams keep policy, receipt storage, and proxy execution on their own machines or private infrastructure. Truss does not become a SaaS middleman.
+					</p>
+				</div>
+				<div class="border border-border-dim bg-surface p-4">
+					<h3 class="text-sm text-text mb-3">Fail closed</h3>
+					<p class="text-dim text-xs leading-relaxed">
+						If the proxy is unreachable, the extension blocks submission instead of silently allowing sensitive prompts through.
+					</p>
+				</div>
+			</div>
+		</section>
+
+		<section class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Process proxy underneath</h2>
 			<p class="text-dim text-sm leading-relaxed mb-4">
-				You don't need to rebuild your agents or modify their codebase. Truss wraps existing tools (like <code>gemini-cli</code>, in-house python pipelines, Cursor, or SDK-based agents) by pointing their client base-URLs at a local uvicorn proxy on your machine.
+				The CLI proxy remains useful for API gateways, local agents, and wrapped command-line tools. It is the same enforcement loop beneath the browser product: inspect payload, apply policy, write a verifiable receipt, then forward only if the decision allows it.
 			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Install (bootstraps a private venv + ledger under ~/.truss/)
-curl -sSL https://trusslabs.org/install.sh | bash
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Browser extension path
+truss proxy start --policy examples/policies
 
-# Wrap gemini-cli (works the same for `claude` — sets ANTHROPIC_BASE_URL)
+# Legacy process wrap path
 truss proxy exec -- gemini-cli
 
-# Inside the wrapped CLI, ask something that contains a patient address:
-#   → Patient lives at 1234 Main St. Summarize their case.
-# Truss intercepts before the model sees it. Receipt:
-ls ~/.truss/ledger/receipts/$(date -u +%F)/
-
-# An auditor can verify every receipt in the ledger:
+# Audit trail
 truss receipt verify ~/.truss/ledger/receipts</code></pre>
+		</section>
 
-			<p class="text-dim text-sm leading-relaxed pt-4">
-				Provider-agnostic by design — Gemini and Claude both wired today; OpenAI is the same reverse-proxy shape. Truss holds no upstream model credentials. The wrapped CLI's own API key (or OAuth token) flows through the inbound request and truss forwards it.
-			</p>
-		</div>
-
-		<div class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Confidential enclave deployment</h2>
-			<p class="text-dim text-sm leading-relaxed mb-4">
-				For zero-trust enterprise security, the Truss proxy container is designed to compile directly into a bootable Enclave Image File (EIF). Running inside AWS Nitro Enclaves or GCP Confidential Space, the CPU encrypts memory at the hardware layer, shielding prompts in-flight even from root cloud administrators.
-			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Compile the audit proxy to an AWS Nitro EIF
-nitro-cli build-enclave --docker-uri truss-audit-proxy:latest --output-file truss-proxy.eif
-
-# The physical CPU validates the image hash (PCR0)
-# Enclave pulls policy decryption keys from KMS only on successful hardware attestation</code></pre>
-			<p class="text-dim text-sm leading-relaxed pt-4">
-				By handling data scrubbing and immutable auditing inside an isolated, hardware-verified runtime, the underlying model is reduced to a stateless utility. You can hot-swap APIs or model providers in minutes without rewriting your security boundary.
-			</p>
-		</div>
-
-		<div class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Offline trace analysis</h2>
+		<section class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Confidential deployment path</h2>
 			<p class="text-dim text-sm leading-relaxed">
-				The same <code>truss</code> CLI ships three primitives for offline analysis of session logs you already have — <code>truss trace translate</code> turns hooks.jsonl into traceable nodes, <code>truss trace analyze</code> finds retry loops and circular-reasoning flags, <code>truss trap</code> halts on the patterns you care about. The original "Unix pipes for AI behavior" story.
+				For enterprise pilots, the same proxy can run as a managed service or inside confidential compute. The browser extension becomes the enforcement point employees actually touch; the private proxy becomes the policy and receipt boundary the security team controls.
 			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-xs leading-relaxed mt-4"><code>cat hooks.jsonl | truss trace translate | truss trace analyze --json --flag FLAG_CIRCULAR_REASONING | truss trap run</code></pre>
-			<p class="text-dim text-sm leading-relaxed pt-4">
-				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
-			</p>
-		</div>
+		</section>
 
-		<div class="pt-4">
+		<section class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Proof and source</h2>
 			<p class="text-dim text-sm leading-relaxed">
-				Status: pre-product as a SKU. First validated discovery call: 2026.05.07. Live demo up. Building toward a paid pilot. I'm writing about the work as it ships rather than waiting for a launch.
+				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Browser extension docs: <a href="https://github.com/trusslabs-org/truss-labs/tree/main/extension">extension/</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
 			</p>
-		</div>
+		</section>
 
-		<script>
-			import * as AsciinemaPlayer from 'asciinema-player';
-			const target = document.getElementById('asciinema-demo');
-			if (target) {
-				AsciinemaPlayer.create(
-					'/demo/truss-exec-wrap.cast',
-					target,
-					{
-						autoPlay: true,
-						loop: true,
-						speed: 1.0,
-						theme: 'asciinema',
-						fit: 'width',
-						controls: true
-					}
-				);
-			}
-		</script>
+		<section class="pt-4">
+			<p class="text-dim text-sm leading-relaxed">
+				Status: pre-product as a SKU. Current public work is focused on the browser extension as the primary customer-facing surface for AI governance at the edge.
+			</p>
+		</section>
 	</main>
 </Layout>
