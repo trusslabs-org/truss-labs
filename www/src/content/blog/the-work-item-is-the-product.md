@@ -4,49 +4,59 @@ description: "Enterprise AI adoption is the wrong unit. The useful middle is cas
 date: "2026-08-10"
 ---
 
-Most enterprise AI conversations still start with the wrong measurement.
+Varun's post on AI adoption being a myth names a problem I keep seeing from the infrastructure side: enterprise AI conversations still start with the wrong measurement.
 
 Who has a seat? Who logged in this month? Who sent five prompts? Which team has the most token usage?
 
 Those numbers are easy to count, but they are a weak proxy for the thing companies actually care about: did the work change?
 
-If a finance team gets access to a chat assistant and invoice throughput stays flat, the dashboard can still report adoption. If ten percent of the organization becomes excellent at AI and seventy percent never changes how they work, the dashboard can still report adoption. If a power user burns ninety percent of the tokens building sophisticated workflows while everyone else writes occasional emails, the dashboard can still report adoption.
+If a team gets access to a chat assistant and the actual queue keeps moving at the same speed, the dashboard can still report adoption. If ten percent of the organization becomes excellent at AI and seventy percent never changes how they work, the dashboard can still report adoption. If a power user burns most of the tokens building sophisticated workflows while everyone else writes occasional emails, the dashboard can still report adoption.
 
 That is not a moral failure. It is a measurement failure.
 
+I do not want to restate his example. The interesting move is to extend the frame.
+
 The better unit is the work item.
 
-## The example that matters
+## The unit shift
 
-Consider an invoice exception.
+The weak version of enterprise AI says:
 
-The weak version of AI says:
-
-> Invoice #48291 failed validation.
+> Here is a chat window. Ask it for help.
 
 The slightly better version says:
 
-> This may be a price variance.
+> Here is an assistant connected to some of your tools.
 
 The useful version says:
 
-> Likely price variance: invoice line 3 bills $18.40/unit against a PO-approved $16.75/unit. The July 12 contract addendum supports $16.75. A similar variance was approved once for expedited freight, but this invoice has no freight note. Recommended action: route to the procurement owner for approval or vendor correction.
+> The work item already arrives with the evidence, policy context, recommendation, routing, and receipt needed for a human to make the decision.
 
-That is the difference between an alert and a prepared case.
+That is the difference between a tool and a prepared case.
 
-The AI did not replace the accounts-payable analyst. It did the work before the work:
+Take an AI-governance review.
 
-- detected the exception
-- classified the likely issue
-- pulled evidence from the PO, contract, receipt, and prior approvals
-- mapped the evidence to policy or precedent
-- recommended the next action
-- routed the case to the right human
-- preserved enough context for later review
+The weak version is a Slack message:
+
+> Can we use this new model vendor for customer-support summaries?
+
+The prepared-case version is a review packet:
+
+> Proposed vendor: external model API. Data classes: customer messages, email addresses, support metadata. Policy hits: PII allowed only with redaction on output; payment data must be blocked from prompt boundary. Required controls: retention disabled, DPA on file, receipt logging enabled, human review for refunds. Recommended decision: allow for Tier 1 support summaries, block for billing disputes until payment-data classifier is deployed.
+
+The AI did not become the compliance team. It prepared the judgment work.
+
+The same pattern applies elsewhere:
+
+- A security alert arrives with affected assets, prior login context, suspected attack path, recommended containment, and the policies that justify severity.
+- A customer-support escalation arrives with product history, failed remediation attempts, refund policy, account value, and suggested response options.
+- A deployment approval arrives with changed services, secrets touched, customer-data paths, rollback plan, test evidence, and risk flags.
+- A contract review arrives with deviations from standard terms, business-owner impact, fallback language, and data-use implications.
+- A vendor-risk review arrives with subprocessors, data residency, security attestations, missing documents, and required approvals.
 
 This is the useful middle between two bad extremes.
 
-It is not personal productivity: "summarize this invoice for me."
+It is not personal productivity: "summarize this ticket for me."
 
 It is not autonomous fantasy: "run the finance department."
 
@@ -82,17 +92,17 @@ That is a much stronger definition of adoption than logins. A workflow has adopt
 
 Prepared cases sound simple until you ask what the system has to touch.
 
-The invoice example may need access to:
+An AI-governance review may need access to:
 
-- the invoice
-- the purchase order
-- contract terms
-- receiving records
-- vendor master data
-- prior exceptions
-- approval policy
-- employee routing rules
-- audit logs
+- vendor contracts
+- data-processing terms
+- security attestations
+- product telemetry
+- customer-data classifications
+- retention settings
+- model-boundary policy
+- approval routing rules
+- audit logs and receipts
 
 That is where the real enterprise problem begins.
 
@@ -113,7 +123,7 @@ This is where Truss Labs connects directly to the workflow story.
 
 ## What Truss cares about
 
-Truss is not trying to be the AP workflow product, the security alert product, or the claims-processing product.
+Truss is not trying to be the support workflow product, the security alert product, or the vendor-risk product.
 
 The Truss layer is lower than that.
 
@@ -128,31 +138,32 @@ It asks:
 
 That matters because case-preparation AI needs more than good prompts. It needs receipts.
 
-If an agent prepares an invoice exception, the enterprise should be able to inspect a durable record:
+If an agent prepares an AI-governance review, the enterprise should be able to inspect a durable record:
 
 ```json
 {
-  "workflow": "accounts_payable_exception",
-  "work_item": "invoice_48291",
+  "workflow": "ai_vendor_review",
+  "work_item": "vendor_review_1042",
   "event": "case_prepared",
   "model_boundary": {
     "vendor": "external_model",
     "direction": "prompt",
-    "verdict": "allowed"
+    "verdict": "allowed_with_controls"
   },
   "evidence": [
-    "invoice.line_items[3]",
-    "purchase_order.price_terms",
-    "contract.addendum.2026-07-12",
-    "prior_exception.approved_variance"
+    "vendor.dpa",
+    "security.soc2_report",
+    "data_map.support_messages",
+    "policy.customer_pii_external_model"
   ],
   "policy": {
-    "policy_id": "ap_price_variance_review",
-    "policy_version": "v1.3"
+    "policy_id": "external_model_customer_data",
+    "policy_version": "v2.1"
   },
   "recommendation": {
-    "reason_code": "price_variance",
-    "route_to": "procurement_owner",
+    "decision": "allow_tier_1_support_summaries",
+    "controls": ["output_redaction", "receipt_logging", "payment_data_prompt_block"],
+    "route_to": "security_and_legal",
     "confidence": "medium"
   }
 }
@@ -198,7 +209,7 @@ That is a board-level metric because it maps directly to operations.
 
 Not "eighty-eight percent of employees used AI."
 
-"Forty-two percent of invoice exceptions now arrive as prepared cases with reason code, source evidence, recommended route, and review receipt."
+"Forty-two percent of vendor reviews now arrive as prepared cases with data classification, policy mapping, recommended controls, approval route, and review receipt."
 
 That is adoption you can manage.
 
