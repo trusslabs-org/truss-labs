@@ -1,144 +1,199 @@
 ---
 title: "The work item is the product"
-description: "Enterprise AI adoption is the wrong unit. The useful middle is case-preparation AI: work arrives with evidence, policy context, recommended action, routing, and an audit trail."
+description: "Varun's AI adoption critique points to the real enterprise unit: not seats, prompts, or tokens, but prepared work items with evidence, policy, routing, and receipts."
 date: "2026-08-10"
 ---
 
-Varun's post on AI adoption being a myth names a problem I keep seeing from the infrastructure side: enterprise AI conversations still start with the wrong measurement.
+[Varun's post on AI adoption](https://x.com/i/status/2085806422072418632) makes a point that feels obvious once someone says it plainly: enterprise AI adoption dashboards are measuring the wrong thing.
 
-Who has a seat? Who logged in this month? Who sent five prompts? Which team has the most token usage?
+Seats are not adoption. Logins are not adoption. Prompt counts are not adoption. Token spend is not adoption.
 
-Those numbers are easy to count, but they are a weak proxy for the thing companies actually care about: did the work change?
+Those are activity metrics. They tell us whether a tool exists, whether someone touched it, and whether money is being burned. They do not tell us whether the work changed.
 
-If a team gets access to a chat assistant and the actual queue keeps moving at the same speed, the dashboard can still report adoption. If ten percent of the organization becomes excellent at AI and seventy percent never changes how they work, the dashboard can still report adoption. If a power user burns most of the tokens building sophisticated workflows while everyone else writes occasional emails, the dashboard can still report adoption.
+That is the part we want to extend.
 
-That is not a moral failure. It is a measurement failure.
+Varun's frame is roughly: most companies get a barbell. A small group becomes very good at AI, a middle group uses it shallowly, and a large group barely changes. We think that is right for broad chatbot rollouts. But the more interesting lesson is not just "train the top slice and automate for everyone else."
 
-I do not want to restate his example. The interesting move is to extend the frame.
+The deeper lesson is that the unit of AI adoption should move from the user to the work item.
 
-The better unit is the work item.
+## The Shape Of The Shift
 
-## The unit shift
+Here is the graph we keep coming back to:
 
-The weak version of enterprise AI says:
+```text
+Operational value
+^
+|                                      Big autonomous agent fantasy
+|                                      "Let AI run the department"
+|                                      High ambition, low trust
+|
+|                    Prepared work items
+|                    "The case arrives with evidence,
+|                     policy, recommendation, route, receipt"
+|                    High leverage, human judgment preserved
+|
+|     Chat productivity
+|     "Summarize this, draft that"
+|     Useful, but detached from the queue
+|
++----------------------------------------------------------------> Workflow integration
+      personal tool              operational layer              governed system
+```
 
-> Here is a chat window. Ask it for help.
+Most of the enterprise AI conversation swings between the bottom-left and the top-right.
 
-The slightly better version says:
+The bottom-left is real but limited: chat as a personal productivity layer.
 
-> Here is an assistant connected to some of your tools.
+The top-right is exciting but usually too vague: autonomous agents running entire business functions.
 
-The useful version says:
+We think the middle is where a lot of durable value will show up first. Not "everyone becomes a prompt expert." Not "the agent replaces the department." Instead:
 
-> The work item already arrives with the evidence, policy context, recommendation, routing, and receipt needed for a human to make the decision.
+> The work item arrives prepared for judgment.
 
-That is the difference between a tool and a prepared case.
+That sounds small. It is not small.
 
-Take an AI-governance review.
+## What We Mean By Prepared
 
-The weak version is a Slack message:
+A prepared work item is not a summary pasted into a chat window.
 
-> Can we use this new model vendor for customer-support summaries?
+It is an operational object that has been enriched before it reaches the human:
 
-The prepared-case version is a review packet:
+```text
+Raw event
+  -> classification
+  -> evidence packet
+  -> policy / contract / history mapping
+  -> recommended next action
+  -> route to the right human
+  -> durable receipt
+  -> human judgment
+```
 
-> Proposed vendor: external model API. Data classes: customer messages, email addresses, support metadata. Policy hits: PII allowed only with redaction on output; payment data must be blocked from prompt boundary. Required controls: retention disabled, DPA on file, receipt logging enabled, human review for refunds. Recommended decision: allow for Tier 1 support summaries, block for billing disputes until payment-data classifier is deployed.
+The AI does not need to pretend to be the owner of the decision. The useful move is earlier than that. It turns messy intake into a case packet.
 
-The AI did not become the compliance team. It prepared the judgment work.
+That is the difference between:
 
-The same pattern applies elsewhere:
+> "Here is a tool. Ask it for help."
 
-- A security alert arrives with affected assets, prior login context, suspected attack path, recommended containment, and the policies that justify severity.
-- A customer-support escalation arrives with product history, failed remediation attempts, refund policy, account value, and suggested response options.
-- A deployment approval arrives with changed services, secrets touched, customer-data paths, rollback plan, test evidence, and risk flags.
-- A contract review arrives with deviations from standard terms, business-owner impact, fallback language, and data-use implications.
-- A vendor-risk review arrives with subprocessors, data residency, security attestations, missing documents, and required approvals.
+and:
 
-This is the useful middle between two bad extremes.
+> "Here is the work. It already contains the context needed to decide."
 
-It is not personal productivity: "summarize this ticket for me."
+## Better Examples Than Chat
 
-It is not autonomous fantasy: "run the finance department."
+The easiest way to see this is through queues.
 
-It is case-preparation AI. The work arrives already shaped for judgment.
+Every serious business already has queues: support queues, security queues, approval queues, compliance queues, procurement queues, legal queues, data-access queues, deployment queues.
 
-## Beyond the barbell
+The question is whether AI stays outside those queues as a side chat window, or whether the queue item itself becomes smarter.
 
-The common enterprise pattern is a barbell.
+### AI Vendor Review
 
-On one end are small chat-window gains: rewrite this email, summarize this PDF, draft this job post. These are real, but they are disconnected from systems of record.
+Weak version:
 
-On the other end is the big-agent fantasy: let AI run the whole workflow. That is usually too broad, too risky, and too hard to audit.
+> Can we use this model vendor for support summaries?
 
-The valuable middle is narrower and more operational:
+Prepared version:
 
-> When X arrives, it already contains Y, Z, and a recommended next action.
+> Proposed vendor: external model API. Data classes: support messages, customer email addresses, account metadata. Policy mapping: PII allowed only with output redaction; payment data blocked from prompt boundary. Evidence: DPA on file, retention controls documented, SOC 2 report current. Missing: billing-dispute workflow review. Recommended decision: allow for Tier 1 support summaries, block for billing disputes until payment-data classifier is deployed. Route: security and legal.
 
-Security alerts arrive with attack narrative, affected assets, and containment steps.
+That is not just a summary. It is a review object.
 
-Contract redlines arrive with risk level, fallback language, and business-owner impact.
+### Security Alert
 
-Support escalations arrive with customer history, likely cause, policy options, and suggested resolution.
+Weak version:
 
-Claims arrive with coverage mapping, missing evidence, and fraud indicators.
+> Suspicious login detected.
 
-Finance anomalies arrive reconciled to source records and policy exceptions.
+Prepared version:
 
-The user is still a human decision-maker. The AI is not pretending to be the department. It is preparing the case packet.
+> New login from unfamiliar ASN followed by OAuth token creation. Prior session from New York occurred 18 minutes earlier. User received a phishing email with matching sender infrastructure. Affected assets: mailbox, CRM token, docs access. Recommended severity: high. Suggested containment: revoke sessions, disable OAuth token, inspect forwarding rules, preserve receipt. Route: security on-call.
 
-That is a much stronger definition of adoption than logins. A workflow has adopted AI when the work item itself changes shape.
+The analyst still decides. But the case arrives with a story, not a blinking light.
 
-## The control-plane problem
+### Support Escalation
 
-Prepared cases sound simple until you ask what the system has to touch.
+Weak version:
 
-An AI-governance review may need access to:
+> Customer is upset about a failed workflow.
 
-- vendor contracts
-- data-processing terms
-- security attestations
-- product telemetry
-- customer-data classifications
-- retention settings
-- model-boundary policy
-- approval routing rules
-- audit logs and receipts
+Prepared version:
 
-That is where the real enterprise problem begins.
+> Enterprise customer escalation. Failure began after workspace migration. Three support attempts repeated the same cache reset. Product logs show permission mismatch on inherited group. Contract tier allows priority engineering review. Recommended action: acknowledge failed prior remediation, route to platform team, offer temporary admin override, and attach incident to renewal risk.
 
-If an AI system prepares judgment work, it is no longer just a text generator. It is now participating in a governed workflow. It needs to know what it was allowed to read, what evidence it used, which policy version it applied, which recommendation it produced, who received the case, and what the human did afterward.
+The AI is not "doing support." It is compressing the hunt.
 
-Without that control plane, case-preparation AI becomes another opaque automation layer.
+### Deployment Approval
 
-The failure mode is not only "the model was wrong." The failure modes are more structural:
+Weak version:
 
-- the model used evidence it should not have accessed
-- the recommendation was based on stale policy
-- the routing decision cannot be explained
-- sensitive data appeared in a downstream surface
-- the human changed the outcome but the system lost the correction
-- the audit trail shows the final decision but not the reasoning path
+> Approve deploy?
 
-This is where Truss Labs connects directly to the workflow story.
+Prepared version:
 
-## What Truss cares about
+> Release touches auth middleware, billing webhook parser, and customer-export job. Secrets: none changed. Data paths: customer email and billing account metadata. Tests: unit pass, integration pass, no migration rollback tested. Policy flags: billing path requires second approver. Recommended action: approve auth change, hold billing parser until rollback is tested. Route: engineering manager plus payments owner.
 
-Truss is not trying to be the support workflow product, the security alert product, or the vendor-risk product.
+This is where AI becomes useful to governance. It prepares the review, but it does not erase accountability.
 
-The Truss layer is lower than that.
+### Contract Redline
 
-It asks:
+Weak version:
+
+> Summarize this contract.
+
+Prepared version:
+
+> Top deviations from standard terms: uncapped liability, customer-data use for model training, 90-day payment terms, termination notice extended to 120 days. Highest risk: data-use clause conflicts with customer commitments. Suggested fallback language attached. Route: legal plus data-governance owner.
+
+That is not a document summary. It is a negotiation packet.
+
+### Data Access Request
+
+Weak version:
+
+> Analyst requests production data access.
+
+Prepared version:
+
+> Request scope: customer event logs for churn analysis. Data classes: user IDs, emails, workspace IDs, billing plan, usage events. Policy: direct email access not needed; pseudonymized export allowed for analytics workspace. Prior similar request approved with 30-day expiry. Recommended decision: approve pseudonymized dataset, deny raw production access, require expiry and receipt. Route: data steward.
+
+This is the Truss-shaped version of AI adoption: the system helps decide what can cross a boundary.
+
+## Why This Connects To Truss
+
+Truss Labs is not trying to be the support platform, the contract tool, the SIEM, or the procurement system.
+
+We care about the layer underneath prepared work:
 
 - What crossed the model boundary?
-- Which policy saw it?
+- Which data classes appeared?
+- Which policy saw them?
 - Was the request allowed, blocked, redacted, or alerted?
 - What session state existed before the decision?
-- What state changed after the decision?
-- Which receipt proves the path later?
+- What changed after the decision?
+- Which receipt proves it later?
 
-That matters because case-preparation AI needs more than good prompts. It needs receipts.
+Prepared work items are only trustworthy if the preparation is inspectable.
 
-If an agent prepares an AI-governance review, the enterprise should be able to inspect a durable record:
+Otherwise we have a familiar failure mode: an AI system gives a confident recommendation, everyone moves faster for a while, and then nobody can answer the basic governance questions.
+
+What did the model see?
+
+Was it allowed to see that?
+
+Which evidence did it use?
+
+Which policy version did it apply?
+
+Did the human accept, edit, or reject the recommendation?
+
+Where is the receipt?
+
+That is the control-plane problem.
+
+## The Receipt Is The Product Boundary
+
+If an agent prepares an AI vendor review, the record should look less like a chat transcript and more like an operational receipt:
 
 ```json
 {
@@ -162,69 +217,69 @@ If an agent prepares an AI-governance review, the enterprise should be able to i
   },
   "recommendation": {
     "decision": "allow_tier_1_support_summaries",
-    "controls": ["output_redaction", "receipt_logging", "payment_data_prompt_block"],
+    "controls": [
+      "output_redaction",
+      "receipt_logging",
+      "payment_data_prompt_block"
+    ],
     "route_to": "security_and_legal",
     "confidence": "medium"
   }
 }
 ```
 
-That record is not a decorative log. It is the structural difference between an AI feature and a governed system.
+That record is not decorative logging. It is the structural difference between "we used AI" and "we can govern the work AI touched."
 
-## Why chat cannot hold this
+This is why we think receipts, policy memory, and model-boundary control are not side features. They are the infrastructure that lets the prepared-work-item pattern become real.
 
-A chat window can produce the same paragraph once.
+## A Better Adoption Dashboard
 
-It cannot reliably own the workflow.
+If we measure AI by user activity, we get tool theater.
 
-The prepared case needs state. It needs identity. It needs policy memory. It needs source links. It needs permission boundaries. It needs a receipt that survives the current browser tab and can be inspected by someone who was not present for the conversation.
+If we measure AI by work-item shape, the dashboard gets much more useful:
 
-This is why I keep coming back to the same architecture:
-
-- the classifier says what data appeared
-- the policy engine decides what can happen
-- the session store remembers bounded context
-- the receipt writer records the decision path
-- the workflow system receives a prepared case, not a raw model response
-
-That is the division of labor.
-
-The model can draft, compare, classify, and recommend. The control plane decides what the model is allowed to see, what the user is allowed to receive, and what proof exists afterward.
-
-## Adoption should be measured at the queue
-
-If we measure AI by tool usage, we get tool theater.
-
-If we measure AI by workflow shape, the questions get better:
-
-- What percentage of exceptions arrive pre-classified?
-- What percentage of cases include linked evidence?
-- How often does the human accept, edit, or reject the recommendation?
-- How much review burden moved from search to judgment?
+- What percentage of security alerts arrive with evidence packets?
+- What percentage of vendor reviews include data-classification and policy mapping?
+- What percentage of support escalations arrive with prior attempts and likely owner?
+- How often do humans accept, edit, or reject the recommendation?
 - Which policy exceptions recur?
-- Which automations are blocked by missing evidence?
+- Which workflows are blocked by missing evidence?
 - Which model calls produced auditable receipts?
+- Where did cycle time improve without increasing unmanaged risk?
 
-That is a board-level metric because it maps directly to operations.
+That is a better board conversation than "monthly active AI users went up."
 
-Not "eighty-eight percent of employees used AI."
+We would rather report:
 
-"Forty-two percent of vendor reviews now arrive as prepared cases with data classification, policy mapping, recommended controls, approval route, and review receipt."
+> Forty-two percent of vendor reviews now arrive as prepared cases with data classification, policy mapping, recommended controls, approval route, and review receipt.
 
-That is adoption you can manage.
+than:
 
-## The work item is the product
+> Eighty-eight percent of employees used AI this month.
+
+The first one says the work changed.
+
+## The Work Item Is The Product
 
 The next wave of enterprise AI will not be won by asking every employee to become a prompt expert.
 
-Some people will. They should be trained, given publishing surfaces, and rewarded for turning their workflows into reusable tools.
+Some people will become power users. We should support them. They are where reusable internal tools, playbooks, evals, and workflow ideas come from.
 
 But most employees do not want a better chat box. They want the work to arrive in a state where judgment is easier.
 
 That is the practical promise of case-preparation AI:
 
-Raw work item in. Prepared case out. Human judgment preserved. Audit trail intact.
+```text
+raw work item in
+prepared case out
+human judgment preserved
+audit trail intact
+```
 
-Truss Labs exists for the hard part underneath that sentence: the policy, memory, boundary control, and receipt layer that lets prepared cases become trustworthy infrastructure instead of another pile of clever text.
+Varun's post is useful because it punctures the shallow adoption story. Our extension is that the enterprise unit should not be the user at all. It should be the work item.
+
+And once the work item becomes the product, the control plane matters.
+
+That is where Truss Labs lives: policy, memory, boundary control, and receipts for the systems that prepare judgment work.
 
 AI disclosure: This post was drafted with assistance from Codex.
