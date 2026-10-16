@@ -63,6 +63,8 @@ _STATE_COMPARATORS = {
     "contains",
     "exists",
     "missing",
+    "eq_from_event",
+    "neq_from_event",
 }
 
 

@@ -15,6 +15,9 @@ PolicyEventType = Literal[
     "browser_upload",
     "browser_download",
     "browser_navigation",
+    "sandbox_upload",
+    "sandbox_prompt",
+    "sandbox_attach_file",
 ]
 
 PolicyDestination = Literal["external_vendor", "internal", "any"]
@@ -39,7 +42,7 @@ class PolicyEvent(BaseModel):
     @property
     def direction(self) -> Literal["prompt", "response"]:
         """Map event type to the legacy prompt/response direction."""
-        if self.type in {"response", "browser_response"}:
+        if self.type in {"response", "browser_response", "sandbox_attach_file"}:
             return "response"
         return "prompt"
 
@@ -58,6 +61,8 @@ def event_type_for_direction(
     """Choose the normalized event type for a legacy direction/surface pair."""
     if surface == "chrome_extension":
         return "browser_prompt" if direction == "prompt" else "browser_response"
+    if surface == "slack_sandbox":
+        return "sandbox_upload" if direction == "prompt" else "sandbox_attach_file"
     return direction
 
 

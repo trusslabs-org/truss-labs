@@ -183,7 +183,7 @@ def evaluate_event(
         if _event_matches(p, event)
         and _direction_matches(p, direction)
         and _destination_matches(p, event.destination)
-        and _state_condition_matches(p, event.session_state)
+        and _state_condition_matches(p, event.session_state, event=event)
     ]
 
     if classifier_error is not None:
@@ -607,7 +607,12 @@ def _event_matches(policy: Policy, event: PolicyEvent) -> bool:
     return event.type in set(policy.event.types)
 
 
-def _state_condition_matches(policy: Policy, state: dict[str, Any]) -> bool:
+def _state_condition_matches(
+    policy: Policy,
+    state: dict[str, Any],
+    *,
+    event: Optional[PolicyEvent] = None,
+) -> bool:
     condition = policy.condition
     if condition is None:
         return True
@@ -615,12 +620,35 @@ def _state_condition_matches(policy: Policy, state: dict[str, Any]) -> bool:
         if key in state:
             return False
     for key, expected in (condition.state or {}).items():
-        if not _state_value_matches(state, key, expected):
+        if not _state_value_matches(state, key, expected, event=event):
             return False
     return True
 
 
-def _state_value_matches(state: dict[str, Any], key: str, expected: Any) -> bool:
+def _resolve_event_path(event: Optional[PolicyEvent], path: str) -> Tuple[bool, Any]:
+    if event is None or not isinstance(path, str) or not path:
+        return False, None
+    current: Any = event.model_dump()
+    for part in path.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+            continue
+        if isinstance(current, list) and part.isdigit():
+            idx = int(part)
+            if 0 <= idx < len(current):
+                current = current[idx]
+                continue
+        return False, None
+    return True, current
+
+
+def _state_value_matches(
+    state: dict[str, Any],
+    key: str,
+    expected: Any,
+    *,
+    event: Optional[PolicyEvent] = None,
+) -> bool:
     exists = key in state
     actual = state.get(key)
     if not isinstance(expected, dict):
@@ -640,6 +668,16 @@ def _state_value_matches(state: dict[str, Any], key: str, expected: Any) -> bool
             return False
         if comparator == "neq" and actual == operand:
             return False
+        if comparator == "eq_from_event":
+            found, ev_val = _resolve_event_path(event, str(operand))
+            if not found or actual != ev_val:
+                return False
+            continue
+        if comparator == "neq_from_event":
+            found, ev_val = _resolve_event_path(event, str(operand))
+            if not found or actual == ev_val:
+                return False
+            continue
         if comparator == "gt" and not _compare(actual, operand, lambda a, b: a > b):
             return False
         if comparator == "gte" and not _compare(actual, operand, lambda a, b: a >= b):
@@ -657,6 +695,8 @@ def _state_value_matches(state: dict[str, Any], key: str, expected: Any) -> bool
         if comparator not in {
             "eq",
             "neq",
+            "eq_from_event",
+            "neq_from_event",
             "gt",
             "gte",
             "lt",

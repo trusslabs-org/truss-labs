@@ -1,0 +1,36 @@
+schema_version: "1.1"
+policy_id: sandbox_stage_sensitive_attachment
+policy_version: v1.0
+description: Record the uploader as workspace owner and increment thread risk when a sensitive attachment is staged into a shared sandbox.
+event:
+  types:
+    - sandbox_upload
+match:
+  direction: prompt
+  destination: external_vendor
+  classes:
+    any_of:
+      - phi:patient_name
+      - phi:patient_dob
+      - phi:patient_address
+      - generic:confidential_internal_email
+      - generic:pii_ssn
+state_updates:
+  - key: workspace_owner
+    op: set_from_event
+    path: actor.user_id
+  - key: staged_file
+    op: set_from_event
+    path: data.file_name
+  - key: staged_sensitive_attachment
+    op: set
+    value: true
+  - key: risk_score
+    op: increment
+    value: 30
+verdict: alert
+alert_config:
+  webhook: null
+audit_only: false
+on_classifier_error: fail_open
+on_state_error: fail_closed

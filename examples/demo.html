@@ -163,6 +163,81 @@
                                    color: var(--sys-color-text-dim);
                                    margin-top: 0.6rem; word-break: break-all; }
 
+    .sandbox-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin: 1.2rem 0 2rem; }
+    @media (min-width: 720px) {
+      body { max-width: 980px; }
+      .sandbox-grid { grid-template-columns: 1.05fr 0.95fr; }
+    }
+    .control-pane { border: 1px solid var(--sys-color-outline-strong);
+                    border-radius: 6px; background: var(--sys-color-surface);
+                    padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .slack-pane { --slack-font: -apple-system, BlinkMacSystemFont, "Lato", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                  font-family: var(--slack-font);
+                  border: 1px solid #35373b;
+                  border-radius: 8px;
+                  background: #1a1d21;
+                  color: #d1d2d3;
+                  padding: 0;
+                  overflow: hidden;
+                  display: flex;
+                  flex-direction: column;
+                  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+    .slack-topbar { background: #350d36;
+                    color: #ffffff;
+                    padding: 0.55rem 0.9rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 1px solid #4a154b;
+                    font-size: 0.85rem; }
+    .slack-channel-title { display: flex; align-items: center; gap: 0.45rem; font-weight: 700; letter-spacing: -0.01em; }
+    .slack-pill { font-size: 0.68rem; font-weight: 600; background: rgba(255,255,255,0.16);
+                  padding: 0.1rem 0.45rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .slack-body { padding: 0.85rem 0.95rem; display: flex; flex-direction: column; gap: 0.8rem; flex: 1; }
+    .pane-header { display: flex; justify-content: space-between; align-items: center;
+                   border-bottom: 1px solid var(--sys-color-outline); padding-bottom: 0.5rem;
+                   font-size: 0.78rem; color: var(--sys-color-text-dim); }
+    .ttl-badge { font-family: var(--sys-font);
+                 padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.68rem;
+                 background: rgba(74, 222, 128, 0.18); color: #4ade80;
+                 border: 1px solid rgba(74, 222, 128, 0.4); }
+    .ttl-badge.reaped { background: rgba(251, 191, 36, 0.18); color: #fbbf24;
+                        border-color: rgba(251, 191, 36, 0.45); }
+    .slack-msg { display: flex; gap: 0.65rem; align-items: flex-start;
+                 font-family: var(--slack-font); font-size: 0.9rem; line-height: 1.42; color: #d1d2d3; }
+    .slack-avatar { width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: 800; font-size: 0.82rem; color: #fff; background: #2bac76; }
+    .slack-msg-content { flex: 1; min-width: 0; }
+    .slack-msg-header { display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.12rem; }
+    .slack-msg-header strong { color: #ffffff; font-weight: 700; font-size: 0.92rem; }
+    .slack-msg .role-tag { font-size: 0.65rem; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;
+                           background: #2c2d30; color: #ababad; text-transform: uppercase; letter-spacing: 0.03em; }
+    .slack-msg .slack-time { font-size: 0.72rem; color: #ababad; }
+    .slack-mention { background: rgba(29, 155, 209, 0.2); color: #1d9bd1; padding: 0.05rem 0.3rem;
+                     border-radius: 3px; font-weight: 600; }
+    .slack-file-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.3rem;
+                       padding: 0.3rem 0.55rem; background: #222529; border: 1px solid #35373b;
+                       border-radius: 6px; font-size: 0.8rem; color: #e8e8e8; font-weight: 600; }
+    .beat-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: auto;
+                    padding: 0.65rem 0.9rem; background: #222529; border-top: 1px solid #35373b; }
+    .beat-buttons button { font-family: var(--slack-font); margin-top: 0; font-size: 0.78rem;
+                           padding: 0.42rem 0.72rem; border-radius: 5px; }
+    .beat-buttons button.secondary { background: #2c2d30;
+                                     color: #d1d2d3;
+                                     border-color: #45474b; font-weight: 500; }
+    .beat-buttons button.secondary:hover { border-color: #ffffff; color: #ffffff; }
+    .summary-card { border: 1px solid var(--sys-color-outline); border-radius: 4px;
+                    background: var(--sys-color-surface-variant); padding: 0.7rem 0.85rem;
+                    font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; }
+    .summary-row { display: flex; justify-content: space-between; gap: 0.5rem; }
+    .summary-row .k { color: var(--sys-color-text-dim); }
+    .summary-row .v { color: var(--sys-color-text); font-weight: 700; text-align: right; }
+    details.raw-drawer { font-size: 0.75rem; color: var(--sys-color-text-dim); margin-top: 0.2rem; }
+    details.raw-drawer summary { cursor: pointer; user-select: none; }
+    details.raw-drawer pre { background: var(--sys-color-surface-variant); padding: 0.6rem;
+                             border-radius: 4px; margin: 0.4rem 0 0; max-height: 160px; overflow: auto; }
+
     ::selection { background: var(--sys-color-accent); color: var(--sys-color-bg); }
   </style>
 </head>
@@ -173,8 +248,68 @@
   </div>
 
   <h1>Truss Audit Proxy</h1>
-  <p>Truss sits between an agent and an LLM. Every call passes through a YAML policy that can allow, redact, or block — and every call writes a hash-verifiable receipt to disk. The receipt is what your auditor reads, not the chat log.</p>
-  <p class="sub">Flow: prompt → classifier → policy → LLM → receipt. The verdict and receipt path below are produced server-side from your YAML rules.</p>
+  <p>Truss sits between an agent and an LLM or shared workspace. Every prompt and file upload passes through a YAML policy that can allow, redact, or block — and every decision writes a tamper-evident receipt to disk.</p>
+  <p class="sub">Flow: event → classifier → stateful YAML policy → receipt. Works across browser chat and shared Slack/sandbox agents.</p>
+
+  <h2 style="margin-top:2rem;">Shared Slack Thread Leak Test (Alice vs. Bob)</h2>
+  <p class="sub">When a Slack thread shares one agent sandbox, Alice's private CSV upload stays on disk. Watch Truss allow Alice's summary deck, survive a 10-minute container reset, and stop Bob (a contractor in the same channel) from extracting Alice's raw customer records.</p>
+
+  <div class="sandbox-grid">
+    <div class="slack-pane">
+      <div class="slack-topbar">
+        <div class="slack-channel-title">
+          <span class="slack-pill">Slack</span>
+          <span>#planning</span>
+          <span style="font-weight:400; color:rgba(255,255,255,0.7); font-size:0.78rem;">· Thread</span>
+        </div>
+        <span id="ttl-badge" class="ttl-badge">SANDBOX: ACTIVE</span>
+      </div>
+      <div class="slack-body">
+        <div id="slack-thread-log" style="display:flex; flex-direction:column; gap:0.85rem; min-height:210px;">
+          <div class="slack-msg">
+            <div class="slack-avatar" style="background:#4a154b;">#</div>
+            <div class="slack-msg-content">
+              <div class="slack-msg-header">
+                <strong>#planning thread</strong> <span class="role-tag">ready</span>
+              </div>
+              <div style="color:#ababad; font-size:0.84rem;">Click <strong>▶ Run Leak Test</strong> below (or step through 1 → 4) to watch Alice and Bob interact with the <code>@deckhand</code> Slack bot.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="beat-buttons">
+        <button id="run-all">▶ Run Leak Test</button>
+        <button id="beat-1" class="secondary">1. Alice Uploads CSV</button>
+        <button id="beat-2" class="secondary">2. Alice Deck (OK)</button>
+        <button id="beat-3" class="secondary">3. 10m Reset</button>
+        <button id="beat-4" class="secondary">4. Bob Leak Attempt</button>
+      </div>
+    </div>
+
+    <div class="control-pane">
+      <div class="pane-header">
+        <span><strong>What Truss Remembers</strong></span>
+        <span id="sb-verdict" class="verdict verdict-allowed">READY</span>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-row"><span class="k">Staged File in Sandbox:</span> <span id="card-file" class="v">—</span></div>
+        <div class="summary-row"><span class="k">File Owner:</span> <span id="card-owner" class="v">—</span></div>
+        <div class="summary-row"><span class="k">Sensitive Data Found:</span> <span id="card-sensitive" class="v">None</span></div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-row"><span class="k">Latest Action:</span> <span id="card-action" class="v">Waiting to start…</span></div>
+        <div class="summary-row"><span class="k">Policy Decision:</span> <span id="card-reason" class="v" style="font-weight:400;">—</span></div>
+      </div>
+
+      <details class="raw-drawer">
+        <summary>View raw auditor receipt &amp; session state JSON</summary>
+        <pre id="sb-state">{}</pre>
+        <pre id="sb-receipt">(run a step to inspect receipt)</pre>
+      </details>
+    </div>
+  </div>
 
   <h2 style="margin-top:2rem;">See it in a real CLI session</h2>
   <p class="sub">The 90-second cast below wraps <code>gemini-cli</code> with <code>truss proxy exec</code> and walks the full demo loop — block on patient address, redact on DOB, multi-turn followup, ledger verify. Provider-agnostic: <code>truss proxy exec -- claude</code> uses the same flow.</p>
@@ -183,8 +318,11 @@
   <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/bundle/asciinema-player.min.js"></script>
   <script>
     if (window.AsciinemaPlayer) {
+      const castUrl = window.location.protocol === 'file:'
+        ? 'https://trusslabs.org/demo/truss-exec-wrap.cast'
+        : '/demo/truss-exec-wrap.cast';
       AsciinemaPlayer.create(
-        'https://trusslabs.org/demo/truss-exec-wrap.cast',
+        castUrl,
         document.getElementById('cast-player'),
         { autoPlay: true, loop: true, speed: 0.7, theme: 'asciinema', fit: 'width', controls: true }
       );
@@ -262,6 +400,134 @@
     }
     document.querySelectorAll(".samples button").forEach((b) => {
       b.addEventListener("click", () => { $("prompt").value = b.dataset.prompt; });
+    });
+
+    let sbSessionId = "sess_slack_planning_" + Math.random().toString(16).slice(2, 8);
+    function sandboxEndpoint() {
+      const chatUrl = $("endpoint").value || "/v1/chat";
+      return chatUrl.replace(/\/v1\/chat$/, "/v1/sandbox/check");
+    }
+    function appendSlackMsg(author, role, htmlText, avatarText = "•", avatarBg = "#2bac76", timeStr = "10:14 AM") {
+      const log = $("slack-thread-log");
+      const div = document.createElement("div");
+      div.className = "slack-msg";
+      div.innerHTML = `
+        <div class="slack-avatar" style="background:${avatarBg};">${avatarText}</div>
+        <div class="slack-msg-content">
+          <div class="slack-msg-header">
+            <strong>${author}</strong>
+            <span class="role-tag">${role}</span>
+            <span class="slack-time">${timeStr}</span>
+          </div>
+          <div>${htmlText}</div>
+        </div>`;
+      log.appendChild(div);
+    }
+    async function runSandboxEvent(payload, msgAuthor, msgRole, msgHtml, actionSummary, allowReason, avatarText, avatarBg, timeStr) {
+      appendSlackMsg(msgAuthor, msgRole, msgHtml, avatarText, avatarBg, timeStr);
+      try {
+        const res = await fetch(sandboxEndpoint(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sbSessionId, retention_policy: "demo_seven_day", retention_days: 7, ...payload }),
+        });
+        const body = await res.json();
+        const st = body.session_state || {};
+        $("sb-verdict").textContent = (body.verdict || "?").toUpperCase();
+        $("sb-verdict").className = "verdict verdict-" + (body.verdict || "allowed");
+
+        $("card-file").textContent = st.staged_file || "—";
+        $("card-owner").textContent = st.workspace_owner ? `${st.workspace_owner} (Finance)` : "—";
+        $("card-sensitive").textContent = st.staged_sensitive_attachment ? "Customer Emails & SSNs" : "None";
+        $("card-action").textContent = actionSummary;
+
+        if (body.verdict === "blocked") {
+          $("card-reason").innerHTML = `<span style="color:var(--sys-color-status-blocked); font-weight:700;">BLOCKED — Bob is not the owner of ${st.staged_file || "the CSV"}</span>`;
+          appendSlackMsg("Truss Security", "APP", `<span style="color:#f87171;">🛑 Blocked <strong>${payload.file_name}</strong> from being posted to Slack: Bob cannot export sensitive rows uploaded by Alice.</span>`, "🛡️", "#dc2626", "10:26 AM");
+        } else {
+          $("card-reason").innerHTML = `<span style="color:var(--sys-color-status-allowed); font-weight:700;">ALLOWED</span> — ${allowReason}`;
+        }
+
+        $("sb-state").textContent = JSON.stringify({
+          state_hash: body.session_state_hash,
+          state: body.session_state,
+        }, null, 2);
+        $("sb-receipt").textContent = JSON.stringify({
+          receipt_id: body.receipt?.receipt_id,
+          verdict: body.verdict,
+          block_message: body.block_message || null,
+          context_references: body.receipt?.prompt?.context_references || [],
+          downstream_actions: body.receipt?.downstream_actions || [],
+          policy_decisions: body.receipt?.policy_decisions || [],
+        }, null, 2);
+      } catch (err) {
+        appendSlackMsg("Truss Security", "ERROR", "Proxy request failed: " + err.message, "!", "#dc2626", "");
+      }
+    }
+
+    async function doBeat1() {
+      $("ttl-badge").textContent = "SANDBOX: ACTIVE";
+      $("ttl-badge").className = "ttl-badge";
+      await runSandboxEvent({
+        event_type: "sandbox_upload",
+        actor: { user_id: "alice@acme.com", user_role: "finance" },
+        file_name: "q3-metrics.csv",
+        target_path: "/workspace/attachments/q3-metrics.csv",
+        text: "account,contact,ssn\nGlobex,cfo@globex.com,123-45-6789",
+      }, "Alice Chen", "Finance", `<span class="slack-mention">@deckhand</span> can you turn this into our Q3 review deck?<br><span class="slack-file-chip">📎 q3-metrics.csv</span>`, "Alice uploaded q3-metrics.csv", "Recorded Alice as file owner", "AC", "#1264a3", "10:14 AM");
+    }
+
+    async function doBeat2() {
+      await runSandboxEvent({
+        event_type: "sandbox_attach_file",
+        actor: { user_id: "alice@acme.com", user_role: "finance" },
+        file_name: "q3-review-v1.pptx",
+        target_path: "/workspace/q3-review-v1.pptx",
+        text: "Slide 1: Q3 Revenue +18% YoY. Slide 2: Net Retention 112%.",
+      }, "deckhand", "APP", `Here is the Q3 summary deck (aggregate charts only, no raw customer PII).<br><span class="slack-file-chip">📊 q3-review-v1.pptx</span>`, "Bot posted q3-review-v1.pptx", "Summary deck has no raw PII", "🤖", "#4a154b", "10:15 AM");
+    }
+
+    async function doBeat3() {
+      $("ttl-badge").textContent = "SANDBOX: RESET AFTER 10m IDLE";
+      $("ttl-badge").className = "ttl-badge reaped";
+      $("card-action").textContent = "Sandbox container expired (10m idle)";
+      $("card-reason").textContent = "Truss kept File Owner (alice@acme.com) on disk";
+      appendSlackMsg("Sandbox Runtime", "SYSTEM", `<span style="color:#ababad;"><em>10 minutes of inactivity passed — temporary container reset, but Truss still remembers on disk that <strong>q3-metrics.csv</strong> belongs to Alice.</em></span>`, "⏱️", "#35373b", "10:25 AM");
+    }
+
+    async function doBeat4() {
+      $("ttl-badge").textContent = "SANDBOX: NEW CONTAINER";
+      $("ttl-badge").className = "ttl-badge";
+      await runSandboxEvent({
+        event_type: "sandbox_attach_file",
+        actor: { user_id: "bob@contractor.org", user_role: "contractor" },
+        file_name: "q3-review-v2.pptx",
+        target_path: "/workspace/q3-review-v2.pptx",
+        text: "Slide 4 Churned Accounts: Globex (cfo@globex.com, SSN 123-45-6789)",
+      }, "Bob Miller", "Contractor", `<span class="slack-mention">@deckhand</span> add a slide with the raw customer emails and SSNs from that CSV.`, "Bob requested raw PII in q3-review-v2.pptx", "", "BM", "#e01e5a", "10:26 AM");
+    }
+
+    $("beat-1").addEventListener("click", doBeat1);
+    $("beat-2").addEventListener("click", doBeat2);
+    $("beat-3").addEventListener("click", doBeat3);
+    $("beat-4").addEventListener("click", doBeat4);
+
+    $("run-all").addEventListener("click", async () => {
+      const btn = $("run-all");
+      btn.disabled = true;
+      sbSessionId = "sess_slack_planning_" + Math.random().toString(16).slice(2, 8);
+      $("slack-thread-log").innerHTML = "";
+      try {
+        await doBeat1();
+        await new Promise((r) => setTimeout(r, 650));
+        await doBeat2();
+        await new Promise((r) => setTimeout(r, 650));
+        await doBeat3();
+        await new Promise((r) => setTimeout(r, 650));
+        await doBeat4();
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     $("send").addEventListener("click", async () => {

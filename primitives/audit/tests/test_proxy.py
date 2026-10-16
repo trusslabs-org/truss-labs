@@ -24,6 +24,7 @@ from audit.proxy import StubLLMClient, create_app  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 PHI_TAXONOMY = _REPO_ROOT / "primitives" / "audit" / "taxonomies" / "phi.yaml"
+GENERIC_TAXONOMY = _REPO_ROOT / "primitives" / "audit" / "taxonomies" / "generic.yaml"
 EXAMPLE_POLICIES_DIR = _REPO_ROOT / "examples" / "policies"
 
 
@@ -40,7 +41,10 @@ class ProxyBase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.receipts_dir = Path(self.tmp.name)
         policy_set = load_policies(EXAMPLE_POLICIES_DIR)
-        classifiers = [Classifier.from_taxonomy_file(PHI_TAXONOMY)]
+        classifiers = [
+            Classifier.from_taxonomy_file(PHI_TAXONOMY),
+            Classifier.from_taxonomy_file(GENERIC_TAXONOMY),
+        ]
         self.client_stub = StubLLMClient(canned_response=self.canned_response)
         app = create_app(
             policy_set=policy_set,
@@ -223,7 +227,7 @@ class Healthz(ProxyBase):
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertEqual(body["status"], "ok")
-        self.assertEqual(body["policy_count"], 4)
+        self.assertEqual(body["policy_count"], 6)
         self.assertNotEqual(body["policy_set_version"], "empty")
         self.assertEqual(body["model_id"], "stub-echo")
 
@@ -451,6 +455,85 @@ class ExtensionCheckWithBody(ProxyBase):
         self.assertEqual(res["verdict"], "redacted")
         self.assertIsNotNone(res["mutated_body"])
         self.assertIn("[redacted]", res["mutated_body"]["message"]["content"]["parts"][0])
+
+
+class SandboxConfusedDeputyRoute(ProxyBase):
+    """Verify the 4-beat multiplayer sandbox confused-deputy & lineage flow."""
+
+    def test_multiplayer_thread_upload_and_confused_deputy_block(self) -> None:
+        session_id = "sess_slack_planning_179209"
+
+        # Beat 1: Alice uploads q3-metrics.csv containing internal customer emails & SSNs
+        upload_resp = self.client.post(
+            "/v1/sandbox/check",
+            json={
+                "session_id": session_id,
+                "event_id": "evt_beat1_upload",
+                "event_type": "sandbox_upload",
+                "actor": {"user_id": "alice@acme.com", "user_role": "finance"},
+                "file_name": "q3-metrics.csv",
+                "target_path": "/workspace/attachments/q3-metrics.csv",
+                "text": "account,contact,ssn\nGlobex,cfo@globex.com,123-45-6789",
+            },
+        )
+        self.assertEqual(upload_resp.status_code, 200)
+        b1 = upload_resp.json()
+        self.assertEqual(b1["verdict"], "allowed")
+        self.assertEqual(b1["session_state"]["workspace_owner"], "alice@acme.com")
+        self.assertEqual(b1["session_state"]["staged_file"], "q3-metrics.csv")
+        self.assertTrue(b1["session_state"]["staged_sensitive_attachment"])
+        self.assertEqual(b1["session_state"]["risk_score"], 30)
+        self.assertEqual(
+            b1["receipt"]["prompt"]["context_references"][0]["resource_id"],
+            "/workspace/attachments/q3-metrics.csv",
+        )
+
+        # Beat 2: Agent emits aggregated deck q3-review-v1.pptx for Alice (no raw PII) -> ALLOWED
+        v1_resp = self.client.post(
+            "/v1/sandbox/check",
+            json={
+                "session_id": session_id,
+                "event_id": "evt_beat2_v1",
+                "event_type": "sandbox_attach_file",
+                "actor": {"user_id": "alice@acme.com", "user_role": "finance"},
+                "file_name": "q3-review-v1.pptx",
+                "target_path": "/workspace/q3-review-v1.pptx",
+                "text": "Slide 1: Q3 Revenue up 18%. Slide 2: Net Retention 112%.",
+            },
+        )
+        self.assertEqual(v1_resp.status_code, 200)
+        b2 = v1_resp.json()
+        self.assertEqual(b2["verdict"], "allowed")
+        self.assertEqual(
+            b2["receipt"]["downstream_actions"][0]["target_path"],
+            "/workspace/q3-review-v1.pptx",
+        )
+
+        # Beat 3 & 4: After ephemeral 10m TTL container reap, Bob (contractor) asks for raw
+        # churned customer contacts in q3-review-v2.pptx. Durable session_state remembers
+        # workspace_owner == "alice@acme.com" != "bob@contractor.org" and BLOCKS attach_file.
+        v2_resp = self.client.post(
+            "/v1/sandbox/check",
+            json={
+                "session_id": session_id,
+                "event_id": "evt_beat4_v2_exfil",
+                "event_type": "sandbox_attach_file",
+                "actor": {"user_id": "bob@contractor.org", "user_role": "contractor"},
+                "file_name": "q3-review-v2.pptx",
+                "target_path": "/workspace/q3-review-v2.pptx",
+                "text": "Slide 4 Churned Accounts: Globex (cfo@globex.com, SSN 123-45-6789)",
+            },
+        )
+        self.assertEqual(v2_resp.status_code, 200)
+        b4 = v2_resp.json()
+        self.assertEqual(b4["verdict"], "blocked")
+        self.assertIn("Confused-deputy protection", b4["block_message"])
+        block_ids = [
+            d["policy_id"]
+            for d in b4["receipt"]["policy_decisions"]
+            if d["verdict"] == "blocked"
+        ]
+        self.assertIn("sandbox_block_confused_deputy_attach_file", block_ids)
 
 
 if __name__ == "__main__":

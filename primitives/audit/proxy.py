@@ -167,6 +167,34 @@ class ExtensionCheckResponse(BaseModel):
     session_state_hash: Optional[str] = None
 
 
+class SandboxCheckRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)
+    event_id: Optional[str] = Field(default=None)
+    event_type: str = Field(default="sandbox_upload")  # "sandbox_upload" | "sandbox_prompt" | "sandbox_attach_file"
+    actor: _Actor
+    file_name: Optional[str] = Field(default=None)
+    target_path: Optional[str] = Field(default=None)
+    text: str = Field(default="")
+    channel_id: Optional[str] = Field(default="#planning")
+    thread_ts: Optional[str] = Field(default=None)
+    vendor: str = Field(default="managed-deepagents")
+    destination: str = Field(default="external_vendor")
+    retention_policy: str = Field(default="default_seven_year")
+    retention_years: int = Field(default=7)
+    retention_days: Optional[int] = Field(default=None)
+
+
+class SandboxCheckResponse(BaseModel):
+    verdict: str  # "allowed" | "blocked" | "redacted"
+    text: str
+    block_message: Optional[str] = None
+    receipt_path: str
+    receipt: Dict[str, Any]
+    session_state: Dict[str, Any]
+    session_state_hash: str
+    policy_set_version: str
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -208,6 +236,14 @@ def create_app(
         if demo_html_path is not None and demo_html_path.is_file():
             return FileResponse(demo_html_path, media_type="text/html")
         return JSONResponse({"status": "ok", "see": "/healthz"})
+
+    @app.get("/demo/truss-exec-wrap.cast")
+    def demo_cast():
+        """Serve the local asciinema cast file so demo.html reflects local edits."""
+        cast_path = Path(__file__).resolve().parents[2] / "www" / "public" / "demo" / "truss-exec-wrap.cast"
+        if cast_path.is_file():
+            return FileResponse(cast_path, media_type="application/x-asciicast")
+        return JSONResponse({"error": "cast not found"}, status_code=404)
 
     @app.get("/healthz")
     def healthz() -> Dict[str, Any]:
@@ -453,6 +489,143 @@ def create_app(
             mutated_body=mutated_body,
             mock_response=mock_response,
             session_state_hash=transition.after_hash,
+        )
+
+    # ------------------------------------------------------------------
+    # Multiplayer Sandbox / Thread Boundary check endpoint.
+    # Governs inbound file staging (sandbox_upload), thread prompts
+    # (sandbox_prompt), and outbound attach_file (sandbox_attach_file).
+    # ------------------------------------------------------------------
+
+    @app.post("/v1/sandbox/check", response_model=SandboxCheckResponse)
+    def sandbox_check(req: SandboxCheckRequest) -> SandboxCheckResponse:
+        actor = req.actor.model_dump(exclude_none=True)
+        tool = {
+            "tool_id": f"{req.vendor}-sandbox",
+            "model_id": llm_client.model_id,
+        }
+        event_id = req.event_id or _generate_event_id()
+        event = PolicyEvent(
+            event_id=event_id,
+            session_id=req.session_id,
+            type=req.event_type,  # type: ignore[arg-type]
+            surface="slack_sandbox",
+            vendor=req.vendor,
+            actor=actor,
+            destination=req.destination,  # type: ignore[arg-type]
+            data={
+                "text": req.text,
+                "file_name": req.file_name,
+                "target_path": req.target_path,
+                "channel_id": req.channel_id,
+                "thread_ts": req.thread_ts,
+            },
+            context={"policy_set_version": policy_set.policy_set_version},
+            session_state={},
+        )
+        direction = event.direction
+        hits = _classify_all(req.text, direction, classifiers)
+        metadata = {
+            "actor_id": req.actor.user_id,
+            "surface": "slack_sandbox",
+            "vendor": req.vendor,
+            "policy_set_version": policy_set.policy_set_version,
+        }
+        state_error: Optional[str] = None
+        try:
+            state_record = state_store.get_or_create(req.session_id, metadata)
+            event = event.model_copy(update={"session_state": state_record.state})
+            evaluation = evaluate_event(
+                event=event,
+                class_hits=hits,
+                policy_set=policy_set,
+            )
+            if evaluation.state_updates:
+                transition = state_store.apply_updates(
+                    req.session_id,
+                    evaluation.state_updates,
+                    event=event,
+                    metadata=metadata,
+                    context={"matched_classes": _matched_classes_from(evaluation)},
+                )
+            else:
+                transition = StateTransition.empty(state_record.state)
+        except SessionStateError as exc:
+            state_error = str(exc)
+            log.warning("session state error for %s: %s", req.session_id, exc)
+            evaluation = evaluate_state_error(
+                event=event,
+                class_hits=hits,
+                policy_set=policy_set,
+            )
+            transition = StateTransition.empty(event.session_state)
+
+        contextual_policy = _contextual_policy_payload(
+            event,
+            transition,
+            state_error=state_error,
+        )
+
+        final_text = (
+            ""
+            if evaluation.final_verdict == "blocked"
+            else (evaluation.mutated_text if evaluation.mutated_text is not None else req.text)
+        )
+        content_hash = "sha256:" + hashlib.sha256(req.text.encode("utf-8")).hexdigest()
+        now_iso = time.strftime("%Y-%m-%dT%H-%M-%SZ", time.gmtime())
+
+        context_references: List[Dict[str, Any]] = []
+        downstream_actions: List[Dict[str, Any]] = []
+
+        if req.event_type == "sandbox_upload" and (req.file_name or req.target_path):
+            context_references.append(
+                {
+                    "type": "sandbox_attachment",
+                    "resource_id": req.target_path or f"/workspace/attachments/{req.file_name}",
+                    "fields_accessed": sorted({h.cls for h in hits}),
+                    "access_method": "slack_thread_upload",
+                }
+            )
+        elif req.event_type == "sandbox_attach_file" and (req.file_name or req.target_path):
+            downstream_actions.append(
+                {
+                    "action_id": f"act_{secrets.token_hex(4)}",
+                    "type": "attach_file",
+                    "target_path": req.target_path or f"/workspace/{req.file_name}",
+                    "target_size_bytes": len(req.text.encode("utf-8")),
+                    "content_hash": content_hash,
+                    "diff_from_response": evaluation.final_verdict == "redacted",
+                    "timestamp": now_iso,
+                }
+            )
+
+        path, receipt = _write_receipt(
+            writer=writer,
+            actor=actor,
+            tool=tool,
+            prompt_text=req.text if direction == "prompt" else f"attach_file({req.file_name or 'artifact'})",
+            response_text=final_text if direction == "response" else "",
+            prompt_hits=hits if direction == "prompt" else [],
+            response_hits=hits if direction == "response" else [],
+            policy_evaluations=[evaluation],
+            contextual_policy=contextual_policy,
+            context_references=context_references,
+            downstream_actions=downstream_actions,
+            llm_meta=None,
+            retention_policy=req.retention_policy,
+            retention_years=req.retention_years,
+            retention_days=req.retention_days,
+        )
+
+        return SandboxCheckResponse(
+            verdict=_extension_verdict(evaluation.final_verdict),
+            text=final_text,
+            block_message=evaluation.block_user_message,
+            receipt_path=str(path),
+            receipt=receipt,
+            session_state=transition.after,
+            session_state_hash=transition.after_hash,
+            policy_set_version=evaluation.policy_set_version,
         )
 
     return app
@@ -722,6 +895,8 @@ def _write_receipt(
     retention_years: int,
     retention_days: Optional[int],
     contextual_policy: Optional[Dict[str, Any]] = None,
+    context_references: Optional[List[Dict[str, Any]]] = None,
+    downstream_actions: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Path, Dict[str, Any]]:
     data_classes = to_data_classes_touched(prompt_hits + response_hits)
     policy_decisions: List[Dict[str, Any]] = []
@@ -734,6 +909,8 @@ def _write_receipt(
         prompt_text=prompt_text,
         response_text=response_text,
         data_classes=data_classes,
+        context_references=context_references,
+        downstream_actions=downstream_actions,
         policy_decisions=policy_decisions,
         contextual_policy=contextual_policy,
         retention_policy=retention_policy,
@@ -943,6 +1120,8 @@ __all__ = [
     "ChatResponse",
     "ExtensionCheckRequest",
     "ExtensionCheckResponse",
+    "SandboxCheckRequest",
+    "SandboxCheckResponse",
     "create_app",
     "create_app_from_env",
 ]

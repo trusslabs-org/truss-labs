@@ -24,7 +24,7 @@ fi
 
 export TRUSS_POLICIES_DIR="${REPO_ROOT}/examples/policies"
 export TRUSS_RECEIPTS_DIR="${TRUSS_RECEIPTS_DIR:-${HOME}/.truss/ledger/receipts}"
-export TRUSS_TAXONOMIES="${REPO_ROOT}/primitives/audit/taxonomies/phi.yaml"
+export TRUSS_TAXONOMIES="${REPO_ROOT}/primitives/audit/taxonomies/phi.yaml:${REPO_ROOT}/primitives/audit/taxonomies/generic.yaml"
 
 cd "${REPO_ROOT}"
 echo "policies:    ${TRUSS_POLICIES_DIR}"

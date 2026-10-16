@@ -1,0 +1,29 @@
+schema_version: "1.1"
+policy_id: sandbox_block_confused_deputy_attach_file
+policy_version: v1.0
+description: Block attach_file in a shared thread sandbox when a non-owner attempts to export sensitive data staged by another user.
+event:
+  types:
+    - sandbox_attach_file
+condition:
+  state:
+    staged_sensitive_attachment:
+      eq: true
+    workspace_owner:
+      neq_from_event: actor.user_id
+match:
+  direction: response
+  destination: external_vendor
+  classes:
+    any_of:
+      - phi:patient_name
+      - phi:patient_dob
+      - phi:patient_address
+      - generic:confidential_internal_email
+      - generic:pii_ssn
+verdict: block
+block_config:
+  user_message: "Confused-deputy protection: outbound attach_file blocked because actor is not the workspace attachment owner and the artifact contains sensitive records."
+audit_only: false
+on_classifier_error: fail_open
+on_state_error: fail_closed

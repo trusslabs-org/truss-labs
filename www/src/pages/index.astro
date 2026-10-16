@@ -116,6 +116,18 @@ import Layout from '../layouts/Layout.astro';
 		</section>
 
 		<section class="pt-4 mb-16">
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Shared Slack &amp; sandbox protection (Alice vs. Bob)</h2>
+			<p class="text-dim text-sm leading-relaxed mb-4">
+				When a Slack thread shares one agent sandbox, a private spreadsheet uploaded by Alice stays on disk in <code>/workspace</code>. Even if the temporary container resets after 10 minutes, Truss remembers on disk that Alice owns the file — allowing Alice's summary deck while blocking Bob (a contractor in the same channel) from extracting raw customer rows into a follow-up file.
+			</p>
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># 1. Alice uploads q3-metrics.csv -> Truss records owner: alice@acme.com
+POST /v1/sandbox/check  event_type=sandbox_upload      verdict=allowed
+
+# 2. Bob asks the bot for raw customer emails in q3-review-v2.pptx
+POST /v1/sandbox/check  event_type=sandbox_attach_file verdict=blocked (bob != owner)</code></pre>
+		</section>
+
+		<section class="pt-4 mb-16">
 			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Process proxy underneath</h2>
 			<p class="text-dim text-sm leading-relaxed mb-4">
 				The CLI proxy remains useful for API gateways, local agents, and wrapped command-line tools. It is the same enforcement loop beneath the browser product: inspect payload, apply policy, write a verifiable receipt, then forward only if the decision allows it.
