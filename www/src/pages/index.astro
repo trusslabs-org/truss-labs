@@ -4,25 +4,207 @@ import Layout from '../layouts/Layout.astro';
 
 <Layout
 	title="Truss Labs"
-	description="Browser-edge governance for ChatGPT, Claude, Gemini, and other web AI clients."
+	description="Session-aware governance and tamper-evident receipts for browser AI, shared Slack sandboxes, and local agents."
 >
+	<style>
+		.slack-widget {
+			--slack-font: -apple-system, BlinkMacSystemFont, "Lato", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			font-family: var(--slack-font);
+			border: 1px solid #35373b;
+			border-radius: 8px;
+			background: #1a1d21;
+			color: #d1d2d3;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+		}
+		.slack-topbar {
+			background: #350d36;
+			color: #ffffff;
+			padding: 0.55rem 0.9rem;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			border-bottom: 1px solid #4a154b;
+			font-size: 0.85rem;
+		}
+		.slack-channel-title {
+			display: flex;
+			align-items: center;
+			gap: 0.45rem;
+			font-weight: 700;
+			letter-spacing: -0.01em;
+		}
+		.slack-pill {
+			font-size: 0.68rem;
+			font-weight: 600;
+			background: rgba(255, 255, 255, 0.16);
+			padding: 0.1rem 0.45rem;
+			border-radius: 4px;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+		}
+		.ttl-badge {
+			font-family: var(--font-mono, monospace);
+			padding: 0.15rem 0.5rem;
+			border-radius: 4px;
+			font-weight: 700;
+			font-size: 0.68rem;
+			background: rgba(74, 222, 128, 0.18);
+			color: #4ade80;
+			border: 1px solid rgba(74, 222, 128, 0.4);
+		}
+		.ttl-badge.reaped {
+			background: rgba(251, 191, 36, 0.18);
+			color: #fbbf24;
+			border-color: rgba(251, 191, 36, 0.45);
+		}
+		.slack-body {
+			padding: 0.85rem 0.95rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.8rem;
+			min-height: 225px;
+			flex: 1;
+		}
+		.slack-msg {
+			display: flex;
+			gap: 0.65rem;
+			align-items: flex-start;
+			font-family: var(--slack-font);
+			font-size: 0.88rem;
+			line-height: 1.42;
+			color: #d1d2d3;
+		}
+		.slack-avatar {
+			width: 30px;
+			height: 30px;
+			border-radius: 6px;
+			flex-shrink: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 800;
+			font-size: 0.78rem;
+			color: #fff;
+			background: #2bac76;
+		}
+		.slack-msg-content {
+			flex: 1;
+			min-width: 0;
+		}
+		.slack-msg-header {
+			display: flex;
+			align-items: baseline;
+			gap: 0.4rem;
+			margin-bottom: 0.12rem;
+		}
+		.slack-msg-header strong {
+			color: #ffffff;
+			font-weight: 700;
+			font-size: 0.9rem;
+		}
+		.slack-role {
+			font-size: 0.64rem;
+			font-weight: 700;
+			padding: 0.05rem 0.35rem;
+			border-radius: 3px;
+			background: #2c2d30;
+			color: #ababad;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+		}
+		.slack-time {
+			font-size: 0.7rem;
+			color: #ababad;
+		}
+		.slack-mention {
+			background: rgba(29, 155, 209, 0.2);
+			color: #1d9bd1;
+			padding: 0.05rem 0.3rem;
+			border-radius: 3px;
+			font-weight: 600;
+		}
+		.slack-file-chip {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			margin-top: 0.3rem;
+			padding: 0.25rem 0.55rem;
+			background: #222529;
+			border: 1px solid #35373b;
+			border-radius: 6px;
+			font-size: 0.78rem;
+			color: #e8e8e8;
+			font-weight: 600;
+		}
+		.slack-actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.4rem;
+			padding: 0.65rem 0.85rem;
+			background: #222529;
+			border-top: 1px solid #35373b;
+			margin-top: auto;
+		}
+		.slack-btn {
+			font-family: var(--slack-font);
+			font-size: 0.76rem;
+			padding: 0.4rem 0.7rem;
+			border-radius: 5px;
+			border: 1px solid var(--sys-color-accent);
+			background: var(--sys-color-accent);
+			color: var(--sys-color-bg);
+			font-weight: 700;
+			cursor: pointer;
+		}
+		.slack-btn.secondary {
+			background: #2c2d30;
+			color: #d1d2d3;
+			border-color: #45474b;
+			font-weight: 500;
+		}
+		.slack-btn.secondary:hover {
+			border-color: #ffffff;
+			color: #ffffff;
+		}
+		.slack-btn:disabled {
+			opacity: 0.55;
+			cursor: wait;
+		}
+		.verdict-pill {
+			padding: 0.15rem 0.5rem;
+			border-radius: 3px;
+			font-weight: 700;
+			font-size: 0.72rem;
+			border: 1px solid rgba(74, 222, 128, 0.35);
+			background: rgba(74, 222, 128, 0.14);
+			color: #4ade80;
+		}
+		.verdict-pill.blocked {
+			border-color: rgba(248, 113, 113, 0.4);
+			background: rgba(248, 113, 113, 0.15);
+			color: #f87171;
+		}
+	</style>
+
 	<main class="pb-20 text-text leading-relaxed antialiased selection:bg-accent selection:text-black">
 		<section class="mb-16 text-sm">
 			<p class="mb-4 text-dim">
-				Truss is an open-source browser governance layer for teams using public AI tools. The Chrome extension hooks ChatGPT, Claude, and Gemini in the browser, checks each prompt against local YAML policies, and blocks or redacts sensitive data before the request leaves the employee's machine.
+				Truss is an open-source governance layer for teams using public AI tools and shared agent workspaces. It checks prompts and file transfers against stateful YAML policies—blocking or redacting sensitive data before it leaves your boundary and writing a tamper-evident receipt for every decision.
 			</p>
 			<p class="text-dim">
-				The proxy still exists, but it is now infrastructure rather than the headline. The product surface is the browser edge: real-time policy enforcement, fail-closed behavior when the proxy is unavailable, and hash-verifiable receipts written to infrastructure you control.
+				One local policy engine and receipt ledger works across every surface where employees touch AI: browser tabs (ChatGPT, Claude, Gemini), shared Slack sandboxes, and wrapped CLI agents.
 			</p>
 		</section>
 
 		<section class="mb-16" aria-labelledby="browser-demo-heading">
 			<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
 				<div>
-					<h2 id="browser-demo-heading" class="text-dim border-l-2 border-accent pl-4 mb-2">Browser-edge demo</h2>
-					<p class="text-dim text-xs">Primary recording target: Chrome extension intercepting ChatGPT, Claude, or Gemini.</p>
+					<h2 id="browser-demo-heading" class="text-dim border-l-2 border-accent pl-4 mb-1">1. Browser-edge protection (ChatGPT, Claude, Gemini)</h2>
+					<p class="text-dim text-xs pl-4">Intercepts prompts inside the browser tab before sensitive data reaches an external model provider.</p>
 				</div>
-				<a href="/demo/truss-exec-wrap.mp4" download class="text-dim text-xs underline hover:text-text transition-colors">Legacy proxy MP4</a>
 			</div>
 
 			<div class="rounded border border-border-dim bg-black/40 overflow-hidden shadow-2xl">
@@ -38,7 +220,7 @@ import Layout from '../layouts/Layout.astro';
 
 				<div class="grid gap-0 md:grid-cols-[1.5fr_1fr]">
 					<div class="bg-surface p-4 md:p-6">
-						<div class="rounded border border-border-dim bg-bg p-4 min-h-[320px] flex flex-col gap-4">
+						<div class="rounded border border-border-dim bg-bg p-4 min-h-[300px] flex flex-col gap-4">
 							<div class="flex items-start gap-3">
 								<div class="w-8 h-8 rounded-full bg-surface-variant shrink-0"></div>
 								<div class="flex-1">
@@ -62,7 +244,7 @@ import Layout from '../layouts/Layout.astro';
 					</div>
 
 					<aside class="border-t md:border-t-0 md:border-l border-border-dim bg-bg p-4 md:p-6">
-						<div class="text-xs text-dim uppercase tracking-normal mb-4">Extension path</div>
+						<div class="text-xs text-dim uppercase tracking-normal mb-4">How the extension works</div>
 						<ol class="space-y-4 text-sm">
 							<li class="flex gap-3">
 								<span class="text-accent font-bold">01</span>
@@ -84,82 +266,256 @@ import Layout from '../layouts/Layout.astro';
 					</aside>
 				</div>
 			</div>
+		</section>
 
-			<div class="flex flex-col gap-2 px-1 pt-4 text-xs text-dim sm:flex-row sm:justify-between">
-				<span>Current homepage visual updated for the browser-extension pivot.</span>
-				<span>Next capture should show block, redact, and fail-closed flows.</span>
+		<section class="pt-4 mb-16" aria-labelledby="slack-demo-heading">
+			<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<h2 id="slack-demo-heading" class="text-dim border-l-2 border-accent pl-4 mb-1">2. Shared Slack &amp; sandbox protection (Alice vs. Bob)</h2>
+					<p class="text-dim text-xs pl-4">
+						When a Slack thread shares one agent sandbox, Alice's uploaded CSV stays on disk. Watch Truss allow Alice's summary deck and block Bob from extracting her raw customer records.
+					</p>
+				</div>
+				<a href="/blog/multiplayer-sandboxes-confused-deputy/" class="text-accent text-xs underline hover:text-text transition-colors shrink-0">Read the write-up →</a>
+			</div>
+
+			<div class="grid gap-4 md:grid-cols-[1.08fr_0.92fr]">
+				<div class="slack-widget">
+					<div class="slack-topbar">
+						<div class="slack-channel-title">
+							<span class="slack-pill">Slack</span>
+							<span>#planning</span>
+							<span style="font-weight:400; color:rgba(255,255,255,0.7); font-size:0.78rem;">· Thread</span>
+						</div>
+						<span id="ttl-badge" class="ttl-badge">SANDBOX: ACTIVE</span>
+					</div>
+					<div class="slack-body" id="slack-thread-log">
+						<div class="slack-msg">
+							<div class="slack-avatar" style="background:#4a154b;">#</div>
+							<div class="slack-msg-content">
+								<div class="slack-msg-header">
+									<strong>#planning thread</strong> <span class="slack-role">ready</span>
+								</div>
+								<div style="color:#ababad; font-size:0.82rem;">
+									Click <strong>▶ Run Leak Test</strong> below (or step through 1 → 4) to watch Alice and Bob interact with the <code>@deckhand</code> Slack bot.
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="slack-actions">
+						<button id="run-all" class="slack-btn">▶ Run Leak Test</button>
+						<button id="beat-1" class="slack-btn secondary">1. Alice CSV</button>
+						<button id="beat-2" class="slack-btn secondary">2. Alice Deck</button>
+						<button id="beat-3" class="slack-btn secondary">3. 10m Reset</button>
+						<button id="beat-4" class="slack-btn secondary">4. Bob Leak</button>
+					</div>
+				</div>
+
+				<div class="border border-border-dim rounded bg-surface p-4 flex flex-col gap-3">
+					<div class="flex items-center justify-between border-b border-border-dim pb-2 text-xs text-dim">
+						<strong class="text-text">What Truss Remembers</strong>
+						<span id="sb-verdict" class="verdict-pill">READY</span>
+					</div>
+
+					<div class="border border-border-dim rounded bg-bg p-3 text-xs flex flex-col gap-2">
+						<div class="flex justify-between gap-2">
+							<span class="text-dim">Staged File in Sandbox:</span>
+							<span id="card-file" class="text-text font-bold text-right">—</span>
+						</div>
+						<div class="flex justify-between gap-2">
+							<span class="text-dim">File Owner:</span>
+							<span id="card-owner" class="text-text font-bold text-right">—</span>
+						</div>
+						<div class="flex justify-between gap-2">
+							<span class="text-dim">Sensitive Data Found:</span>
+							<span id="card-sensitive" class="text-text font-bold text-right">None</span>
+						</div>
+					</div>
+
+					<div class="border border-border-dim rounded bg-bg p-3 text-xs flex flex-col gap-2">
+						<div class="flex justify-between gap-2">
+							<span class="text-dim">Latest Action:</span>
+							<span id="card-action" class="text-text font-bold text-right">Waiting to start…</span>
+						</div>
+						<div class="flex justify-between gap-2">
+							<span class="text-dim">Policy Decision:</span>
+							<span id="card-reason" class="text-text text-right">—</span>
+						</div>
+					</div>
+
+					<details class="text-xs text-dim mt-auto">
+						<summary class="cursor-pointer select-none hover:text-text">View raw auditor receipt &amp; session state JSON</summary>
+						<pre id="sb-receipt" class="bg-bg border border-border-dim rounded p-2 mt-2 overflow-x-auto max-h-40 text-[11px]">{}</pre>
+					</details>
+				</div>
 			</div>
 		</section>
 
 		<section class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">What ships in the extension</h2>
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">What ships in Truss</h2>
 			<div class="grid gap-4 md:grid-cols-3">
 				<div class="border border-border-dim bg-surface p-4">
-					<h3 class="text-sm text-text mb-3">Prompt interception</h3>
+					<h3 class="text-sm text-text mb-3">Prompt &amp; file interception</h3>
 					<p class="text-dim text-xs leading-relaxed">
-						The extension hooks web AI clients directly, so policy checks happen at the user interaction layer rather than after data has already reached a model provider.
+						Hooks web AI clients and shared agent sandboxes directly, checking prompts and file exports before sensitive data crosses the boundary.
 					</p>
 				</div>
 				<div class="border border-border-dim bg-surface p-4">
-					<h3 class="text-sm text-text mb-3">Local enforcement</h3>
+					<h3 class="text-sm text-text mb-3">Session memory on disk</h3>
 					<p class="text-dim text-xs leading-relaxed">
-						Teams keep policy, receipt storage, and proxy execution on their own machines or private infrastructure. Truss does not become a SaaS middleman.
+						Policies remember file owners and cumulative risk across turns and 10-minute sandbox resets—stopping cross-user leaks that one-shot scanners miss.
 					</p>
 				</div>
 				<div class="border border-border-dim bg-surface p-4">
-					<h3 class="text-sm text-text mb-3">Fail closed</h3>
+					<h3 class="text-sm text-text mb-3">Tamper-evident receipts</h3>
 					<p class="text-dim text-xs leading-relaxed">
-						If the proxy is unreachable, the extension blocks submission instead of silently allowing sensitive prompts through.
+						Every allow, redact, or block writes a hash-chained JSON receipt on infrastructure you control so auditors never have to reconstruct chat logs.
 					</p>
 				</div>
 			</div>
 		</section>
 
 		<section class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Shared Slack &amp; sandbox protection (Alice vs. Bob)</h2>
+			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">3. Process proxy underneath</h2>
 			<p class="text-dim text-sm leading-relaxed mb-4">
-				When a Slack thread shares one agent sandbox, a private spreadsheet uploaded by Alice stays on disk in <code>/workspace</code>. Even if the temporary container resets after 10 minutes, Truss remembers on disk that Alice owns the file — allowing Alice's summary deck while blocking Bob (a contractor in the same channel) from extracting raw customer rows into a follow-up file.
+				The same local proxy powers the browser extension, Slack sandbox checks, and wrapped command-line agents: inspect payload, apply YAML policy, write a verifiable receipt, and forward only when allowed.
 			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># 1. Alice uploads q3-metrics.csv -> Truss records owner: alice@acme.com
-POST /v1/sandbox/check  event_type=sandbox_upload      verdict=allowed
-
-# 2. Bob asks the bot for raw customer emails in q3-review-v2.pptx
-POST /v1/sandbox/check  event_type=sandbox_attach_file verdict=blocked (bob != owner)</code></pre>
-		</section>
-
-		<section class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Process proxy underneath</h2>
-			<p class="text-dim text-sm leading-relaxed mb-4">
-				The CLI proxy remains useful for API gateways, local agents, and wrapped command-line tools. It is the same enforcement loop beneath the browser product: inspect payload, apply policy, write a verifiable receipt, then forward only if the decision allows it.
-			</p>
-			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Browser extension path
+			<pre class="bg-surface border border-border-dim rounded p-4 overflow-x-auto text-sm leading-relaxed"><code># Start the local policy &amp; receipt engine
 truss proxy start --policy examples/policies
 
-# Legacy process wrap path
+# Wrap a local CLI agent
 truss proxy exec -- gemini-cli
 
-# Audit trail
+# Verify the receipt chain on disk
 truss receipt verify ~/.truss/ledger/receipts</code></pre>
-		</section>
-
-		<section class="pt-4 mb-16">
-			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Confidential deployment path</h2>
-			<p class="text-dim text-sm leading-relaxed">
-				For enterprise pilots, the same proxy can run as a managed service or inside confidential compute. The browser extension becomes the enforcement point employees actually touch; the private proxy becomes the policy and receipt boundary the security team controls.
-			</p>
 		</section>
 
 		<section class="pt-4 mb-16">
 			<h2 class="text-dim border-l-2 border-accent pl-4 mb-6">Proof and source</h2>
 			<p class="text-dim text-sm leading-relaxed">
-				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a>. Browser extension docs: <a href="https://github.com/trusslabs-org/truss-labs/tree/main/extension">extension/</a>. Live audit-proxy demo: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>.
-			</p>
-		</section>
-
-		<section class="pt-4">
-			<p class="text-dim text-sm leading-relaxed">
-				Status: pre-product as a SKU. Current public work is focused on the browser extension as the primary customer-facing surface for AI governance at the edge.
+				Source: <a href="https://github.com/trusslabs-org/truss-labs">github.com/trusslabs-org/truss-labs</a> ·
+				Latest Lab Note: <a href="/blog/multiplayer-sandboxes-confused-deputy/">When a Slack thread shares one sandbox, Alice's file becomes Bob's leak</a> ·
+				Live audit-proxy sandbox: <a href="https://demo.trusslabs.org">demo.trusslabs.org</a>
 			</p>
 		</section>
 	</main>
+
+	<script is:inline>
+		(function () {
+			const $ = (id) => document.getElementById(id);
+			function appendSlackMsg(author, role, htmlText, avatarText, avatarBg, timeStr) {
+				const log = $("slack-thread-log");
+				if (!log) return;
+				const div = document.createElement("div");
+				div.className = "slack-msg";
+				div.innerHTML = `
+					<div class="slack-avatar" style="background:${avatarBg};">${avatarText}</div>
+					<div class="slack-msg-content">
+						<div class="slack-msg-header">
+							<strong>${author}</strong>
+							<span class="slack-role">${role}</span>
+							<span class="slack-time">${timeStr}</span>
+						</div>
+						<div>${htmlText}</div>
+					</div>`;
+				log.appendChild(div);
+			}
+
+			function step1() {
+				$("ttl-badge").textContent = "SANDBOX: ACTIVE";
+				$("ttl-badge").className = "ttl-badge";
+				$("sb-verdict").textContent = "ALLOWED";
+				$("sb-verdict").className = "verdict-pill";
+				$("card-file").textContent = "q3-metrics.csv";
+				$("card-owner").textContent = "alice@acme.com (Finance)";
+				$("card-sensitive").textContent = "Customer Emails & SSNs";
+				$("card-action").textContent = "Alice uploaded q3-metrics.csv";
+				$("card-reason").innerHTML = '<span style="color:#4ade80;font-weight:700;">ALLOWED</span> — Recorded Alice as file owner';
+				$("sb-receipt").textContent = JSON.stringify({
+					event_type: "sandbox_upload",
+					verdict: "allowed",
+					session_state: {
+						workspace_owner: "alice@acme.com",
+						staged_file: "q3-metrics.csv",
+						staged_sensitive_attachment: true,
+						risk_score: 30
+					},
+					context_references: [
+						{ path: "/workspace/attachments/q3-metrics.csv", classes: ["generic:confidential_internal_email", "generic:pii_ssn"] }
+					]
+				}, null, 2);
+				appendSlackMsg("Alice Chen", "Finance", `<span class="slack-mention">@deckhand</span> can you turn this into our Q3 review deck?<br><span class="slack-file-chip">📎 q3-metrics.csv</span>`, "AC", "#1264a3", "10:14 AM");
+			}
+
+			function step2() {
+				$("sb-verdict").textContent = "ALLOWED";
+				$("sb-verdict").className = "verdict-pill";
+				$("card-action").textContent = "Bot posted q3-review-v1.pptx";
+				$("card-reason").innerHTML = '<span style="color:#4ade80;font-weight:700;">ALLOWED</span> — Summary deck has no raw PII';
+				$("sb-receipt").textContent = JSON.stringify({
+					event_type: "sandbox_attach_file",
+					actor: "alice@acme.com",
+					verdict: "allowed",
+					downstream_actions: [
+						{ tool: "attach_file", target: "/workspace/q3-review-v1.pptx", verdict: "allowed" }
+					]
+				}, null, 2);
+				appendSlackMsg("deckhand", "APP", `Here is the Q3 summary deck (aggregate charts only, no raw customer PII).<br><span class="slack-file-chip">📊 q3-review-v1.pptx</span>`, "🤖", "#4a154b", "10:15 AM");
+			}
+
+			function step3() {
+				$("ttl-badge").textContent = "SANDBOX: RESET AFTER 10m IDLE";
+				$("ttl-badge").className = "ttl-badge reaped";
+				$("card-action").textContent = "Sandbox container expired (10m idle)";
+				$("card-reason").textContent = "Truss kept File Owner (alice@acme.com) on disk";
+				appendSlackMsg("Sandbox Runtime", "SYSTEM", `<span style="color:#ababad;"><em>10 minutes of inactivity passed — temporary container reset, but Truss still remembers on disk that <strong>q3-metrics.csv</strong> belongs to Alice.</em></span>`, "⏱️", "#35373b", "10:25 AM");
+			}
+
+			function step4() {
+				$("ttl-badge").textContent = "SANDBOX: NEW CONTAINER";
+				$("ttl-badge").className = "ttl-badge";
+				$("sb-verdict").textContent = "BLOCKED";
+				$("sb-verdict").className = "verdict-pill blocked";
+				$("card-action").textContent = "Bob requested raw PII in q3-review-v2.pptx";
+				$("card-reason").innerHTML = '<span style="color:#f87171;font-weight:700;">BLOCKED — Bob is not the owner of q3-metrics.csv</span>';
+				$("sb-receipt").textContent = JSON.stringify({
+					event_type: "sandbox_attach_file",
+					actor: "bob@contractor.org",
+					verdict: "blocked",
+					policy_id: "sandbox_block_confused_deputy_attach_file",
+					condition_matched: {
+						staged_sensitive_attachment: true,
+						workspace_owner: "alice@acme.com (!= bob@contractor.org)"
+					},
+					downstream_actions: [
+						{ tool: "attach_file", target: "/workspace/q3-review-v2.pptx", verdict: "blocked" }
+					]
+				}, null, 2);
+				appendSlackMsg("Bob Miller", "Contractor", `<span class="slack-mention">@deckhand</span> add a slide with the raw customer emails and SSNs from that CSV.`, "BM", "#e01e5a", "10:26 AM");
+				appendSlackMsg("Truss Security", "APP", `<span style="color:#f87171;">🛑 Blocked <strong>q3-review-v2.pptx</strong> from being posted to Slack: Bob cannot export sensitive rows uploaded by Alice.</span>`, "🛡️", "#dc2626", "10:26 AM");
+			}
+
+			$("beat-1")?.addEventListener("click", step1);
+			$("beat-2")?.addEventListener("click", step2);
+			$("beat-3")?.addEventListener("click", step3);
+			$("beat-4")?.addEventListener("click", step4);
+
+			$("run-all")?.addEventListener("click", async () => {
+				const btn = $("run-all");
+				btn.disabled = true;
+				$("slack-thread-log").innerHTML = "";
+				try {
+					step1();
+					await new Promise((r) => setTimeout(r, 650));
+					step2();
+					await new Promise((r) => setTimeout(r, 650));
+					step3();
+					await new Promise((r) => setTimeout(r, 650));
+					step4();
+				} finally {
+					btn.disabled = false;
+				}
+			});
+		})();
+	</script>
 </Layout>

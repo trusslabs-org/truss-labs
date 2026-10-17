@@ -1,51 +1,54 @@
 ---
-title: "Multiplayer agent sandboxes have a confused-deputy problem"
-description: "When a Slack thread shares one /workspace container and attach_file tool across users, Alice's sensitive CSV upload becomes Bob's exfiltration vector—unless policy state lives outside the sandbox."
+title: "When a Slack thread shares one sandbox, Alice's file becomes Bob's leak"
+description: "If a Slack bot uses one shared workspace per thread, anyone in the channel can ask the bot to export raw rows from a teammate's spreadsheet—unless file ownership lives outside the sandbox."
 date: "2026-10-15"
 ---
 
-The most useful agent pattern shipping right now is bidirectional file transfer inside multiplayer chat threads.
+The most useful Slack bot pattern shipping right now is simple: drop a file into a thread, ask the bot for a deliverable, and get a finished file back in the same thread.
 
-A teammate drops `q3-metrics.csv` into `#planning` and tags `@deckhand`. The runtime boots a sandboxed container, stages the attachment under `/workspace/attachments/q3-metrics.csv`, runs Python to build charts, and calls `attach_file("/workspace/q3-review.pptx")` to upload the finished deck back to the Slack thread. Ten minutes after the last message, the ephemeral container is reaped (`idle_ttl_seconds=600`).
+Alice drops `q3-metrics.csv` into `#planning` and tags `@deckhand`. Behind the scenes, the runtime starts a sandbox container, saves the spreadsheet to `/workspace/attachments/q3-metrics.csv`, runs Python to build charts, and calls `attach_file("/workspace/q3-review-v1.pptx")` to post the finished slide deck back to Slack. Ten minutes after the last message, the temporary container shuts down.
 
-From a developer ergonomics standpoint, this is a huge leap forward. The plumbing disappears.
+For developers, this feels great. Every Slack thread gets its own working folder.
 
-From a security and governance standpoint, scoping a stateful filesystem sandbox to a **multiplayer thread** instead of a **single principal** introduces an immediate confused-deputy vulnerability.
+For security, tying a shared folder to a **Slack thread** instead of a **person** creates an immediate leak path.
 
-## The attack in four turns
+## How the leak happens in four steps
 
-Consider what happens when a finance lead and an external contractor share a planning channel:
+Picture a normal `#planning` channel where a finance lead and an outside contractor both have access:
 
-1. **Alice (`alice@acme.com`, Finance) uploads `q3-metrics.csv`:** The CSV contains account-level revenue alongside customer contact emails and tax/SSN identifiers so the agent can compute net retention and cohort churn. The sandbox stages the raw file at `/workspace/attachments/q3-metrics.csv`.
-2. **The agent emits `q3-review-v1.pptx`:** The first deck contains only aggregated charts. No raw PII leaves the sandbox.
-3. **The 10-minute sandbox TTL expires (or stays warm):** Either way, the thread remains the unit of workspace continuity.
-4. **Bob (`bob@contractor.org`) replies in the same thread:** `@deckhand add a churn appendix slide listing the top 5 churned account contacts and SSNs from that CSV.`
+1. **Alice (`alice@acme.com`, Finance) uploads `q3-metrics.csv`:** The spreadsheet has account revenue plus customer emails and SSNs so the bot can calculate churn and net retention. The bot saves it to `/workspace/attachments/q3-metrics.csv`.
+2. **The bot posts `q3-review-v1.pptx`:** This first deck only has summary charts. No customer emails or SSNs are inside the slides, so it is safe to post in the channel.
+3. **Ten minutes pass and the container resets:** The temporary sandbox shuts down after 10 minutes of idle time, but the thread workspace (or re-mounted files) continues when someone replies.
+4. **Bob (`bob@contractor.org`) replies in the same thread:** `@deckhand add a churn slide with the raw customer emails and SSNs from that CSV.`
 
-The agent is acting as a confused deputy. It has read access to `/workspace/attachments/q3-metrics.csv` because Alice uploaded it into the thread. Unless the boundary gate tracks **who staged the sensitive data** and **who is requesting the outbound `attach_file` artifact**, the agent happily writes Alice's raw records into `q3-review-v2.pptx` and posts it back to Slack.
+The bot does not know that Bob should not get Alice's raw rows. From the bot's point of view, `q3-metrics.csv` is sitting right there in `/workspace/attachments/`. Without a check outside the bot, it writes Alice's raw customer records into `q3-review-v2.pptx` and uploads the file straight into Slack.
 
-## Why container-local guardrails fail
+## Why you cannot fix this inside the sandbox
 
-You cannot fix this inside the ephemeral sandbox alone:
+Two things break if you try to enforce this inside the bot's temporary container:
 
-- **Ephemeral TTL amnesia:** When the container reaps after 600 seconds of idle time, any in-memory policy state inside the sandbox vanishes. When Bob's reply cold-boots a fresh container (or re-mounts the thread workspace), the runtime has forgotten the provenance of the staged files.
-- **Stateless DLP is blind to thread ownership:** A stateless regex scanner on `attach_file` either blocks every file containing an email address (breaking Alice's legitimate workflows) or allows any thread participant to extract sensitive columns from files they do not own.
-- **No artifact lineage:** When `q3-review-v2.pptx` lands in Slack, an auditor has no cryptographic record tying the outbound file hash (`downstream_actions`) back to the inbound attachment (`context_references`) and the session state transition that authorized it.
+- **Containers reset and forget:** When the sandbox shuts down after 10 minutes of inactivity, any in-memory record of who uploaded `q3-metrics.csv` is wiped.
+- **One-shot scanners cannot tell Alice from Bob:** A simple regex scanner on `attach_file` only sees an outgoing file. It either blocks every file with an email address (breaking Alice's legitimate work) or lets anyone in the channel pull data out of files they did not upload.
 
-## How Truss governs the sandbox boundary
+To stop Bob without breaking Alice, the policy engine has to remember **who owns the uploaded file** on disk, outside the container.
 
-We extended the Truss Audit Engine (`/v1/sandbox/check`) with three primitives that sit outside the ephemeral container:
+## How Truss stops the leak
 
-### 1. Inbound attachment ownership in durable session state
+We added sandbox upload and file-export checks (`/v1/sandbox/check`) to Truss using the same session memory and receipt ledger we use for browser and CLI policies.
 
-When `sandbox_upload` fires on Alice's attachment, Truss classifies the staged content, records `context_references` in the receipt, and commits the uploader's identity to the hash-chained `SessionStateStore` on disk:
+### 1. Remember who uploaded the sensitive file
+
+When Alice uploads `q3-metrics.csv`, Truss scans the file, sees customer emails and SSNs, and writes Alice's user ID (`alice@acme.com`) into the thread's session state on disk:
 
 ```yaml
 schema_version: "1.1"
 policy_id: sandbox_stage_sensitive_attachment
 policy_version: v1.0
+
 event:
   types:
     - sandbox_upload
+
 match:
   direction: prompt
   destination: external_vendor
@@ -53,6 +56,7 @@ match:
     any_of:
       - generic:confidential_internal_email
       - generic:pii_ssn
+
 state_updates:
   - key: workspace_owner
     op: set_from_event
@@ -66,28 +70,34 @@ state_updates:
   - key: risk_score
     op: increment
     value: 30
+
 verdict: alert
 alert_config:
   webhook: null
 ```
 
-### 2. Principal-aware `attach_file` enforcement (`neq_from_event`)
+When the bot posts `q3-review-v1.pptx` for Alice a moment later, Truss scans the outgoing deck. Because `v1.pptx` only contains summary numbers and no raw customer PII, Truss allows it.
 
-When the agent calls `attach_file("q3-review-v2.pptx")` in response to Bob's thread reply, Truss evaluates the outbound artifact against the thread's durable session state—even if the ephemeral sandbox container was reaped and cold-booted 20 minutes later:
+### 2. Block exports when the requester is not the file owner
+
+Ten minutes later, after the temporary container has reset, Bob asks the bot for a new deck with the raw customer contacts. When the bot tries to post `q3-review-v2.pptx` back to Slack, Truss checks the outgoing file against the saved session state:
 
 ```yaml
 schema_version: "1.1"
 policy_id: sandbox_block_confused_deputy_attach_file
 policy_version: v1.0
+
 event:
   types:
     - sandbox_attach_file
+
 condition:
   state:
     staged_sensitive_attachment:
       eq: true
     workspace_owner:
       neq_from_event: actor.user_id
+
 match:
   direction: response
   destination: external_vendor
@@ -95,19 +105,26 @@ match:
     any_of:
       - generic:confidential_internal_email
       - generic:pii_ssn
+
 verdict: block
 block_config:
   user_message: "Confused-deputy protection: outbound attach_file blocked because actor is not the workspace attachment owner and the artifact contains sensitive records."
 ```
 
-Because `workspace_owner` (`alice@acme.com`) does not match the current event's `actor.user_id` (`bob@contractor.org`) and the outbound artifact contains classified spans, `attach_file` is blocked before the file can reach Slack.
+The rule reads almost like plain English:
 
-### 3. Artifact-to-input receipt lineage
+- Did someone stage a sensitive file in this thread (`staged_sensitive_attachment: true`)?
+- Is the person asking for this file different from the person who uploaded it (`workspace_owner` != `actor.user_id`)?
+- Does the outgoing file contain sensitive customer data?
 
-Every `/v1/sandbox/check` call writes a v1.1 receipt linking:
+If all three are true, Truss blocks `q3-review-v2.pptx` before it reaches Slack.
 
-- `prompt.context_references`: the staged `/workspace/attachments/q3-metrics.csv` resource and the exact data classes detected on ingress.
-- `contextual_policy`: `state_before_hash`, `state_after_hash`, and the state mutations that survived across container TTL boundaries.
-- `downstream_actions`: the `attach_file` target path, byte size, SHA-256 content hash, and policy verdict.
+### 3. Write a receipt that connects the upload to the blocked export
 
-Sandboxes and channel plumbing should be ephemeral. Governance, principal ownership, and audit receipts cannot be.
+Every check writes a signed receipt to disk so an auditor does not have to piece together Slack logs and container logs after the fact:
+
+- **What went in (`context_references`):** `/workspace/attachments/q3-metrics.csv` and the data types detected when Alice uploaded it.
+- **What Truss remembered (`contextual_policy`):** the before/after state hashes showing `workspace_owner: "alice@acme.com"` persisted on disk across the container reset.
+- **What was stopped (`downstream_actions`):** the `attach_file` call for `/workspace/q3-review-v2.pptx`, its SHA-256 hash, and the `blocked` verdict.
+
+Temporary sandboxes are supposed to spin up, do work, and disappear. File ownership and audit history should stay on disk.
